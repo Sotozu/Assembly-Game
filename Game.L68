@@ -1,0 +1,2594 @@
+00001000 Starting Address
+Assembler used: EASy68K Editor/Assembler v5.16.01
+Created On: 4/22/2022 1:56:02 PM
+
+00000000                             1      *-----------------------------------------------------------
+00000000                             2  * Title      : Sling Boy
+00000000                             3  * Written by : Alexander Soto
+00000000                             4  * Date       :
+00000000                             5  * Description: A game where you pop the balloons!
+00000000                             6  *-----------------------------------------------------------
+00000000                             7  
+00000000                             8  *ASSIGNMENT REQUIREMENTS*
+00000000                             9  
+00000000                            10  *1. User input control of game entity (i.e. paddle in Pong, aiming a turret, etc)
+00000000                            11      
+00000000                            12  *   Implemented in moving the fireline for shooting 
+00000000                            13  *   GetInput.x68 -> GetKeyPresses subroutine
+00000000                            14      
+00000000                            15  *2. Bitmap background with entities moving around over it
+00000000                            16  
+00000000                            17  *   Implementd through the Seven Segment in the top right corner of the game.
+00000000                            18  *   DrawGame.x68 -> ClearSevSeg subroutine    
+00000000                            19  
+00000000                            20  *3. Physics update of game entity, including acceleration (gravity would be good example)
+00000000                            21  
+00000000                            22  *   Implemented in the rocks change in Y velocity when going accross the screen by applying gravity.
+00000000                            23  *   UpdateGame.x68 -> UpdateRock subroutine    
+00000000                            24  
+00000000                            25  *4. Fixed point math
+00000000                            26  
+00000000                            27  *   Implemented through the SIN COS table and applied to the fire line
+00000000                            28  *   UpdateGame.x68 -> UpdateFireLine subroutine
+00000000                            29  
+00000000                            30  *5. Collision detection between game entities
+00000000                            31  
+00000000                            32  *   Implemented between the rock and the balloon
+00000000                            33  *   UpdateGame.x68 -> CheckIfRockCollided
+00000000                            34  
+00000000                            35  *6. A score indicator as a 7-segment LED
+00000000                            36  
+00000000                            37  *   Implemented in the top right corner
+00000000                            38  *   DrawGame.x68 -> SetSevenSegment subroutine
+00000000                            39  
+00000000                            40  *7. Randomness
+00000000                            41  
+00000000                            42  *   LFSR implementation for random color generation in the last balloon
+00000000                            43  *   UpdateGame.x68 -> RandomColorLFSR
+00000000                            44  
+00000000                            45  
+00000000                            46  *--------------MAIN GAME LOOP--------------*
+00000000                            47  *Take user input
+00000000                            48  *Update data
+00000000                            49  *Draw
+00000000                            50  *Check if Loss -> if true break
+00000000                            51  *Check if Win -> if true break
+00000000                            52  *Otherwise loop
+00000000                            53    
+00001000                            54  START: ORG    $1000
+00001000  4EB9 00015F3E             55      jsr LoadDataBeforeGameLoop
+00001006  4EB9 00001010             56      jsr MainGameLoop
+0000100C  FFFF FFFF                 57      SIMHALT             ; halt simulator       
+00001010                            58  
+00001010                            59  MainGameLoop:
+00001010                            60  
+00001010  4EB9 000163A2             61      jsr GetInput
+00001016  4EB9 00016472             62      jsr UpdateGame
+0000101C  4EB9 00016908             63      jsr DrawGame
+00001022                            64      
+00001022                            65      *Check if LOSE
+00001022  2239 0000114A             66      move.l (B_Is_Lose),d1
+00001028  B27C 0001                 67      cmp #1,d1
+0000102C  6700 0012                 68      beq GameLost
+00001030                            69      
+00001030                            70      *Check if WIN
+00001030  2239 00001146             71      move.l (B_Is_Win),d1
+00001036  B27C 0001                 72      cmp #1,d1
+0000103A  66D4                      73      bne MainGameLoop
+0000103C                            74      
+0000103C  4E75                      75      rts
+0000103E                            76      
+0000103E                            77  GameWon:
+0000103E  4E75                      78      rts
+00001040                            79  GameLost:
+00001040  4E75                      80      rts    
+00001042                            81      
+00001042                            82      INCLUDE "VariablesEquates.x68"
+00001042                            83  ALL_REG                     REG D0-D7/A0-A6
+00001042                            84  
+00001042  =00000008                 85  TRAP_GET_TIME               EQU     8
+00001042  =0000000A                 86  TRAP_PRINT_NULLT_DEFAULT    EQU     10
+00001042  =0000000B                 87  TRAP_GET_CURSOR_POS         EQU     11
+00001042  =0000000B                 88  TRAP_CLEAR_SCREEN           EQU     11
+00001042  =0000000D                 89  TRAP_DISP_NULLT_STR_CRLF    EQU     13
+00001042  =0000000E                 90  TRAP_DISP_NULLT_STR         EQU     14
+00001042  =0000000F                 91  TRAP_DISP_UNSNUM_D1         EQU     15
+00001042  =00000011                 92  TRAP_DBUFFER_MODE           EQU     17
+00001042  =00000013                 93  TRAP_GET_PRESSED_KEY        EQU     19
+00001042  =00000021                 94  TRAP_SET_OUTPUT_RESOLUTION  EQU     33
+00001042  =00000032                 95  TRAP_CLOSE_ALL_FILES        EQU     50
+00001042  =00000033                 96  TRAP_OPEN_EXISTING_FILE     EQU     51
+00001042  =00000035                 97  TRAP_READ_FILE              EQU     53
+00001042  =00000037                 98  TRAP_SET_READ_POSITION      EQU     55
+00001042  =00000038                 99  TRAP_CLOSE_FILE             EQU     56
+00001042  =0000003D                100  TRAP_GET_MOUSE_INPUTS       EQU     61
+00001042  =00000049                101  TRAP_PLAY_WAV_SOUND         EQU     73
+00001042  =00000050                102  TRAP_SET_PEN_COLOR          EQU     80
+00001042  =00000051                103  TRAP_SET_FILL_COLOR         EQU     81
+00001042  =00000052                104  TRAP_DRAW_PIXEL             EQU     82
+00001042  =00000054                105  TRAP_DRAW_LINE              EQU     84
+00001042  =00000058                106  TRAP_DRAW_CIRCLE            EQU     88
+00001042  =0000005C                107  TRAP_DRAWING_MODE           EQU     92
+00001042  =0000005D                108  TRAP_SET_PEN_WIDTH          EQU     93
+00001042  =0000005E                109  TRAP_REPAINT_SCREEN         EQU     94
+00001042                           110  
+00001042  =00000280                111  SCREEN_WIDTH                EQU 640
+00001042  =000001E0                112  SCREEN_HEIGHT               EQU 480
+00001042  =00000001                113  TOTAL_UNIQUE_SPRITES        EQU 1           *Number of unique sprites loaded into memory from a BMP file
+00001042  =00000002                114  TOTAL_SPRITE_DIM_VALUES     EQU 2            *will always need to be 2x that of TOTAL_UNIQUE_SPRITES
+00001042  =00000001                115  FRAME_DELAY_TIME            EQU 1
+00001042  =00000001                116  FRAME_UPDATE_RATE           EQU 1
+00001042  =0000001E                117  FIRE_LINE_LENGTH            EQU 30 *keep at 30
+00001042  =00000001                118  GRAVITY                     EQU 1
+00001042  =0000000A                119  GRAVITY_FRAME_COUNTER       EQU 10
+00001042                           120  
+00001042                           121  
+00001042  =00FFFFFF                122  WHITE                       EQU $00FFFFFF   *used to not print sprite background
+00001042  =000000FF                123  RED                         EQU $000000FF
+00001042  =0000FF00                124  GREEN                       EQU $0000FF00
+00001042  =00FF0000                125  BLUE                        EQU $00FF0000
+00001042  =00000000                126  BLACK                       EQU $00000000
+00001042  =00808080                127  GREY                        EQU $00808080
+00001042                           128  
+00001042                           129  
+00001042  =00000014                130  BALLOON_WIDTH               EQU 20
+00001042  =00000014                131  BALLOON_HEIGHT              EQU 20
+00001042  =00000064                132  BALLOON_TOP_Y_POSITION      EQU 100
+00001042  =00000004                133  BALLOON_INIT_VELOCITY       EQU 4
+00001042  =00000244                134  BALLOON_SPAWN_RIGHT_X       EQU 580
+00001042  =00000190                135  BALLOON_SPAWN_LOWER_Y       EQU 400
+00001042  =0000021C                136  BALLOON_SPAWN_LEFT_X        EQU 540
+00001042  =00000168                137  BALLOON_SPAWN_UPPER_Y       EQU 360
+00001042                           138  
+00001042  =00000005                139  ROCK_WIDTH                  EQU 5
+00001042  =00000005                140  ROCK_HEIGHT                 EQU 5
+00001042  =00000064                141  ROCK_TOP_Y_POSITION         EQU 100
+00001042  =00000014                142  ROCK_INIT_VELOCITY          EQU 20
+00001042  =0000004B                143  ROCK_SPAWN_LEFT_X           EQU 75
+00001042  =00000190                144  ROCK_SPAWN_UPPER_Y          EQU 400
+00001042  =00000050                145  ROCK_SPAWN_RIGHT_X          EQU 80
+00001042  =00000195                146  ROCK_SPAWN_LOWER_Y          EQU 405
+00001042                           147  
+00001042  =0000004B                148  PFIRE_LINE_ORG_X            EQU 75
+00001042  =00000190                149  PFIRE_LINE_ORG_Y            EQU 400
+00001042  =00000002                150  FIRE_LINE_WIDTH             EQU 2
+00001042                           151  
+00001042                           152  
+00001042                           153  ArrM_Sprite_Mem_Loc ds.l TOTAL_UNIQUE_SPRITES
+00001046                           154  ArrM_Sprite_ML_END *When iterating the array if the reads go beyond this point then reset
+00001046                           155  
+00001046                           156  ArrV_Sprite_Dimensions ds.l TOTAL_SPRITE_DIM_VALUES
+0000104E                           157  ArrV_Sprite_D_END
+0000104E                           158  
+0000104E                           159  V_Background1_ImageH        ds.l 1
+00001052                           160  V_Background1_ImageW        ds.l 1
+00001056                           161  V_Background1_ImageBD       ds.l 1
+0000105A                           162  M_Background1_DataSLocation ds.l 1
+0000105E                           163  
+0000105E                           164  V_Win_ImageH                ds.l 1
+00001062                           165  V_Win_ImageW                ds.l 1
+00001066                           166  V_Win_ImageBD               ds.l 1
+0000106A                           167  M_Win_DataSLocation         ds.l 1
+0000106E                           168  
+0000106E                           169  V_Lose_ImageH               ds.l 1
+00001072                           170  V_Lose_ImageW               ds.l 1
+00001076                           171  V_Lose_ImageBD              ds.l 1
+0000107A                           172  M_Lose_DataSLocation        ds.l 1
+0000107E                           173  
+0000107E                           174  V_Archer_ImageH             ds.l 1
+00001082                           175  V_Archer_ImageW             ds.l 1
+00001086                           176  V_Archer_ImageBD            ds.l 1
+0000108A                           177  M_Archer_DataSLocation      ds.l 1
+0000108E                           178  
+0000108E                           179  V_Rock_Current_LXPOS        ds.l 1 *Left X
+00001092                           180  V_Rock_Current_UYPOS        ds.l 1 *Upper Y
+00001096                           181  V_Rock_Current_RXPOS        ds.l 1 *Right X
+0000109A                           182  V_Rock_Current_LYPOS        ds.l 1 *Lower Y
+0000109E                           183  
+0000109E                           184  V_Rock_X_Velocity           ds.l 1
+000010A2                           185  V_Rock_Y_Velocity           ds.l 1 *will need to be updated by gravity when firing
+000010A6                           186  
+000010A6                           187  V_Rock_Prev_UYPOS           ds.l 1 *previous upper y (used to remove)
+000010AA                           188  V_Rock_Prev_LYPOS           ds.l 1 *previous lower y (used to remove)
+000010AE                           189  
+000010AE                           190  V_Rock_Prev_LXPOS           ds.l 1 *previous left x (used to remove)
+000010B2                           191  V_Rock_Prev_RXPOS           ds.l 1 *previous right x (used to remove)
+000010B6                           192  
+000010B6                           193  Gravity_Cumulative          ds.l 1
+000010BA                           194  Gravity_Frame_Count         ds.l 1
+000010BE                           195  Gravity_Max                 ds.l 1
+000010C2                           196  B_Velocity_Reverse          ds.l 1
+000010C6                           197  
+000010C6                           198  Cosine_Cumulative           ds.l 1
+000010CA                           199  Sine_Cumulative             ds.l 1
+000010CE                           200  AngleThetaOfShot            ds.l 1 *1 is 30 degrees, 2 is 45 degrees and 3 is 60 degrees
+000010D2                           201  SineOfAngle                 ds.l 1
+000010D6                           202  CosineOfAngle               ds.l 1
+000010DA                           203  
+000010DA                           204  V_FireLine_X_End_POS        ds.l 1
+000010DE                           205  V_FireLine_Y_End_POS        ds.l 1
+000010E2                           206  V_FireLine_Pre_X_End_POS    ds.l 1
+000010E6                           207  V_FireLine_Pre_Y_End_POS    ds.l 1
+000010EA                           208  
+000010EA                           209  V_Balloon_Current_LXPOS     ds.l 1 *Left X
+000010EE                           210  V_Balloon_Current_UYPOS     ds.l 1 *Upper Y
+000010F2                           211  V_Balloon_Current_RXPOS     ds.l 1 *Right X
+000010F6                           212  V_Balloon_Current_LYPOS     ds.l 1 *Lower Y
+000010FA                           213  V_Balloon_Velocity          ds.l 1
+000010FE                           214  
+000010FE                           215  V_Balloon_Prev_UYPOS        ds.l 1 *previous *upper y (used to remove)
+00001102                           216  V_Balloon_Prev_LYPOS        ds.l 1 *previous *lower y (used to remove)
+00001106                           217  B_Balloon_Reached_MY        ds.l 1 *Boolian if balloon has reached the max Y position. Used for clamping 
+0000110A                           218  B_Balloon_Reached_LY        ds.l 1 *Boolian if balloon has reached the lower Y position. Used for clamping.
+0000110E                           219  B_Last_Balloon              ds.l 1
+00001112                           220  V_Balloon_Collision_Counter ds.l 1
+00001116                           221  V_Balloon_Color             ds.l 1
+0000111A                           222  
+0000111A                           223  SecondCounter               ds.l 1 *used for seven segment
+0000111E                           224  CurrentTime                 ds.l 1
+00001122                           225  PreviousTime                ds.l 1
+00001126                           226  DeltaTime                   ds.l 1
+0000112A                           227  TimeUpdateBool              ds.l 1 *FALSE = 0 and TRUE = 1
+0000112E                           228                                     *This will be set when the FRAME_UPDATE_RATE is met in the GetDeltaTime function in UpdateGame.x68
+0000112E                           229                                     *Objects in the game that require updating will look to this bool and see if it has been set to true or false
+0000112E                           230                                     
+0000112E                           231  B_Second_Passed             ds.l 1 *FALSE = 0 and TRUE = 1
+00001132                           232                                     *Updated for seven segment
+00001132                           233                                     
+00001132                           234  B_CollisionOccured          ds.l 1
+00001136                           235                      
+00001136                           236  B_UpKeyPressed              ds.l 1
+0000113A                           237  B_DownKeyPressed            ds.l 1
+0000113E                           238  B_FireKeyPressed            ds.l 1
+00001142                           239  
+00001142                           240  RandomSeedLFSR              ds.l 1
+00001146                           241  B_Is_Win                    ds.l 1
+0000114A                           242  B_Is_Lose                   ds.l 1
+0000114E                           243  B_Screen_First_Print        ds.l 1
+00001152                           244  SevenSegCounter1            ds.l 1 *inner
+00001156                           245  SevenSegCounter2            ds.l 1 *outer
+0000115A                           246  
+0000115A                           247  buffer                      ds.l 1
+0000115E                           248  HexColor                    ds.l 1
+00001162                           249  FID                         ds.l 1
+00001166                           250  Bitdepth                    ds.l 1
+0000116A                           251  CropStartYCoordinate        ds.l 1
+0000116E                           252  CropStartXCoordinate        ds.l 1
+00001172                           253  CropHeight                  ds.l 1
+00001176                           254  CropWidth                   ds.l 1
+0000117A                           255  CropPrintYCoordinate        ds.l 1
+0000117E                           256  CropPrintXCoordinate        ds.l 1
+00001182                           257  TotalIntialBytePaddingOffset ds.l 1
+00001186                           258  BytePaddingOffset           ds.l 1
+0000118A                           259  
+0000118A                           260  
+0000118A                           261  NumberOfRowsToSkipToGetToCrop   ds.l 1
+0000118E                           262  NumBytesToSkipToGetToCrop       ds.l 1
+00001192                           263  BytesToSkipForNextRead          ds.l 1
+00001196                           264  
+00001196                           265  ByteOffsetToBeginReadingCropData ds.l 1
+0000119A                           266  CropReadOffsetCounter            ds.l 1
+0000119E                           267  CropReadOffset                   ds.l 1
+000011A2                           268  
+000011A2                           269  
+000011A2                           270  
+000011A2                           271  
+000011A2                           272  
+000011A2                           273  
+000011A2= 0007 0006 0004           274  COS_TABLE                   dc.w $7,$6,$4
+000011A8= 0004 0006 0007           275  SIN_TABLE                   dc.w $4,$6,$7
+000011AE                           276  
+000011AE= 0000000F 00000011 ...    277  VELOCITY_TABLE              dc.l $F,$11,$15 *30,20,40
+000011BA= 000000FF 0000FF00 ...    278  COLOR_TABLE                 dc.l $000000FF,$0000FF00,$00FF0000,$00FFFFFF,$00000000 *RED,GREEN,BLUE,WHITE,BLACK
+000011CE                           279  COLOR_TABLE_END
+000011CE                           280                              
+000011CE                           281  SEVEN_SEGMENT_BITMASK_TABLE 
+000011CE= 6F                       282                              dc.b %01101111 *9
+000011CF= 7F                       283                              dc.b %01111111 *8
+000011D0= 07                       284                              dc.b %00000111 *7
+000011D1= 7D                       285                              dc.b %01111101 *6
+000011D2= 6D                       286                              dc.b %01101101 *5
+000011D3= 66                       287                              dc.b %01100110 *4
+000011D4= 4F                       288                              dc.b %01001111 *3
+000011D5= 5B                       289                              dc.b %01011011 *2
+000011D6= 06                       290                              dc.b %00000110 *1
+000011D7= 3F                       291                              dc.b %00111111 *0 GFEDCBA
+000011D8                           292                            
+000011D8                           293  SEVEN_SEG_PRINT_COORDINATES 
+000011D8= 0082                     294                              dc.w 130 *x1 A
+000011DA= 000A                     295                              dc.w 10  *y1 A
+000011DC= 008C                     296                              dc.w 140 *x2 A
+000011DE= 000A                     297                              dc.w 10  *y2 A
+000011E0                           298  
+000011E0= 008C                     299                              dc.w 140 *x1 B
+000011E2= 000A                     300                              dc.w 10  *y1 B
+000011E4= 008C                     301                              dc.w 140 *x2 B
+000011E6= 0019                     302                              dc.w 25  *y2 B
+000011E8                           303                              
+000011E8= 008C                     304                              dc.w 140 *x1 C
+000011EA= 0019                     305                              dc.w 25  *y1 C
+000011EC= 008C                     306                              dc.w 140 *x2 C
+000011EE= 0028                     307                              dc.w 40  *y2 C
+000011F0                           308                              
+000011F0= 008C                     309                              dc.w 140 *x1 D
+000011F2= 0028                     310                              dc.w 40  *y1 D
+000011F4= 0082                     311                              dc.w 130 *x2 D
+000011F6= 0028                     312                              dc.w 40  *y2 D
+000011F8                           313                              
+000011F8= 0082                     314                              dc.w 130 *x1 E
+000011FA= 0028                     315                              dc.w 40  *y1 E
+000011FC= 0082                     316                              dc.w 130 *x2 E
+000011FE= 0019                     317                              dc.w 25  *y2 E
+00001200                           318                              
+00001200= 0082                     319                              dc.w 130 *x1 F
+00001202= 0019                     320                              dc.w 25  *y1 F
+00001204= 0082                     321                              dc.w 130 *x2 F
+00001206= 000A                     322                              dc.w 10  *y2 F
+00001208                           323                              
+00001208= 0082                     324                              dc.w 130 *x1 G
+0000120A= 0019                     325                              dc.w 25  *y1 G
+0000120C= 008C                     326                              dc.w 140 *x2 G
+0000120E= 0019                     327                              dc.w 25  *y2 G
+00001210                           328                              
+00001210                           329                              
+00001210                           330  SEVEN_SEG_PRINT_COORDINATES2                            
+00001210                           331                              
+00001210= 006E                     332                              dc.w 110 *x1 A
+00001212= 000A                     333                              dc.w 10  *y1 A
+00001214= 0078                     334                              dc.w 120 *x2 A
+00001216= 000A                     335                              dc.w 10  *y2 A
+00001218                           336  
+00001218= 0078                     337                              dc.w 120 *x1 B
+0000121A= 000A                     338                              dc.w 10  *y1 B
+0000121C= 0078                     339                              dc.w 120 *x2 B
+0000121E= 0019                     340                              dc.w 25  *y2 B
+00001220                           341                              
+00001220= 0078                     342                              dc.w 120 *x1 C
+00001222= 0019                     343                              dc.w 25  *y1 C
+00001224= 0078                     344                              dc.w 120 *x2 C
+00001226= 0028                     345                              dc.w 40  *y2 C
+00001228                           346                              
+00001228= 0078                     347                              dc.w 120 *x1 D
+0000122A= 0028                     348                              dc.w 40  *y1 D
+0000122C= 006E                     349                              dc.w 110 *x2 D
+0000122E= 0028                     350                              dc.w 40  *y2 D
+00001230                           351                              
+00001230= 006E                     352                              dc.w 110 *x1 E
+00001232= 0028                     353                              dc.w 40  *y1 E
+00001234= 006E                     354                              dc.w 110 *x2 E
+00001236= 0019                     355                              dc.w 25  *y2 E
+00001238                           356                              
+00001238= 006E                     357                              dc.w 110 *x1 F
+0000123A= 0019                     358                              dc.w 25  *y1 F
+0000123C= 006E                     359                              dc.w 110 *x2 F
+0000123E= 000A                     360                              dc.w 10  *y2 F
+00001240                           361                              
+00001240= 006E                     362                              dc.w 110 *x1 G
+00001242= 0019                     363                              dc.w 25  *y1 G
+00001244= 0078                     364                              dc.w 120 *x2 G
+00001246= 0019                     365                              dc.w 25  *y2 G
+00001248                           366  
+00001248                           367                                                       
+00001248                           368                              
+00001248= 424D                     369  BMP_file_identifier dc.w $424D                            
+0000124A                           370                              
+0000124A                           371   
+0000124A                           372  
+0000124A                           373  
+0000124A                           374  
+0000124A= 53 74 61 74 69 63 ...    375  String_FileName             dc.b 'StaticBackground.bmp',0
+0000125F                           376  
+0000125F= 42 61 6C 6C 6F 6E ...    377  String_BallonPop_Sound      dc.b 'BallonPop.wav',0
+0000126D= 54 68 72 6F 77 2E ...    378  String_Throw_Sound          dc.b 'Throw.wav',0
+00001277                           379  
+00001278= 00000001                 380  buffer2                     dc.l 1
+0000127C                           381  
+0000127C                           382  ARCHER_START_BMP_FILE INCBIN "Archer.bmp"
+000040CC                           383  ARCHER_END_BMP_FILE
+000040CC                           384  
+000040CC                           385  WIN_START_BMP_FILE INCBIN "You Win1.bmp"
+00009BF4                           386  WIN_END_BMP_FILE
+00009BF4                           387  
+00009BF4                           388  LOSE_START_BMP_FILE INCBIN "You Lose1.bmp"
+00015F14                           389  LOSE_END_BMP_FILE
+00015F14                           390  
+00015F14  =00002E50                391  ARCHER_FILE_SIZE                 EQU (ARCHER_END_BMP_FILE-ARCHER_START_BMP_FILE)
+00015F14  =0000128E                392  ARCHER_PWIDTH_MEM_LOC            EQU ARCHER_START_BMP_FILE+18
+00015F14  =00001292                393  ARCHER_PHEIGHT_MEM_LOC           EQU ARCHER_START_BMP_FILE+22 
+00015F14  =00001298                394  ARCHER_BITDEPTH_MEM_LOC          EQU ARCHER_START_BMP_FILE+28
+00015F14  =000012B2                395  ARCHER_COLOR_DATA_MEM_LOC        EQU ARCHER_START_BMP_FILE+54
+00015F14                           396  
+00015F14  =00005B28                397  WIN_FILE_SIZE                    EQU (WIN_END_BMP_FILE-WIN_START_BMP_FILE)
+00015F14  =000040DE                398  WIN_PWIDTH_MEM_LOC               EQU WIN_START_BMP_FILE+18
+00015F14  =000040E2                399  WIN_PHEIGHT_MEM_LOC              EQU WIN_START_BMP_FILE+22 
+00015F14  =000040E8                400  WIN_BITDEPTH_MEM_LOC             EQU WIN_START_BMP_FILE+28
+00015F14  =00004102                401  WIN_COLOR_DATA_MEM_LOC           EQU WIN_START_BMP_FILE+54
+00015F14                           402  
+00015F14  =0000C320                403  LOSE_FILE_SIZE                   EQU (LOSE_END_BMP_FILE-LOSE_START_BMP_FILE)
+00015F14  =00009C06                404  LOSE_PWIDTH_MEM_LOC              EQU LOSE_START_BMP_FILE+18
+00015F14  =00009C0A                405  LOSE_PHEIGHT_MEM_LOC             EQU LOSE_START_BMP_FILE+22 
+00015F14  =00009C10                406  LOSE_BITDEPTH_MEM_LOC            EQU LOSE_START_BMP_FILE+28
+00015F14  =00009C2A                407  LOSE_COLOR_DATA_MEM_LOC          EQU LOSE_START_BMP_FILE+54
+00015F14                           408  
+00015F14  =00000012                409  BACKGROUND_WIDTH_BYTE_OFFSET     EQU 18
+00015F14  =00000016                410  BACKGROUND_HEIGHT_BYTE_OFFSET    EQU 22 
+00015F14  =00000036                411  BACKGROUND_DATA_BYTE_OFFSET      EQU 54
+00015F14  =0000001C                412  BACKGROUND_BITDEPTH_BYTE_READ    EQU 28
+00015F14                           413  
+00015F14                           414  
+00015F14                           415  
+00015F14                           416  
+00015F14                           417  
+00015F14                           418  
+00015F14                           419  
+00015F14                           420  
+00015F14                           421  
+00015F14                           422  
+00015F14                           423  
+00015F14                           424  
+00015F14                           425  
+00015F14                           426  
+00015F14                           427  
+00015F14                           428  
+00015F14                           429  
+00015F14                           430  
+00015F14                           431  
+00015F14                           432  
+00015F14                           433  
+00015F14                           434  
+00015F14                           435  
+00015F14                           436  
+00015F14                           437  
+00015F14                           438  
+00015F14                           439  
+00015F14                           440  
+00015F14                           441  
+00015F14                           442  
+00015F14                           443  
+00015F14                           444  
+00015F14                           445  
+00015F14                           446  
+00015F14                           447  
+00015F14                           448  
+00015F14                           449  
+00015F14                           450  
+00015F14                           451  
+00015F14                           452  
+00015F14                           453  
+00015F14                           454  
+00015F14                           455  
+00015F14                           456  
+00015F14                           457  
+00015F14                           458  
+00015F14                           459  -------------------- end include --------------------
+00015F14                           460      INCLUDE "GeneralFunctions.x68"
+00015F14                           461  
+00015F14                           462  
+00015F14                           463  BigEndianToLittleEndian:
+00015F14                           464      
+00015F14  E159                     465      rol.w #8,d1
+00015F16  4841                     466      swap.w d1
+00015F18  E159                     467      rol.w #8,d1
+00015F1A                           468       
+00015F1A  4E75                     469      rts
+00015F1C                           470  
+00015F1C                           471  MULTIPLY_FUNCTION:
+00015F1C  B27C 0000                472      cmp #0,d1
+00015F20  6700 0016                473      beq mult_0
+00015F24  B27C 0001                474      cmp #1,d1
+00015F28  6700 0012                475      beq mult_1
+00015F2C  2602                     476      move.l d2,d3
+00015F2E  5381                     477      subi.l #1,d1
+00015F30                           478  cont_mult
+00015F30  D483                     479      add.l d3,d2
+00015F32  5381                     480      subi.l #1,d1
+00015F34  66FA                     481      bne cont_mult
+00015F36  4E75                     482      rts
+00015F38                           483  mult_0
+00015F38  7400                     484      move.l #0,d2
+00015F3A  4E75                     485      rts
+00015F3C                           486  mult_1
+00015F3C  4E75                     487      rts
+00015F3E                           488  
+00015F3E                           489  
+00015F3E                           490  -------------------- end include --------------------
+00015F3E                           491      INCLUDE "LoadDataBeforeGameLoop.x68"
+00015F3E                           492  LoadDataBeforeGameLoop:
+00015F3E                           493  
+00015F3E  4EB9 000160D8            494      jsr InitVarAndProcess
+00015F44  4EB9 00015F70            495      jsr SetScreenResolution
+00015F4A  4EB9 00016004            496      jsr LoadSpriteData
+00015F50  4EB9 00015F7E            497      jsr LoadConditionScreenFileData
+00015F56                           498      
+00015F56  4EB9 00016186            499      jsr LoadBackgroundPrint
+00015F5C  4EB9 0001636E            500      jsr LoadCropData
+00015F62  4EB9 00016052            501      jsr InitializeBallon
+00015F68  4EB9 0001609E            502      jsr InitializeRock
+00015F6E                           503      
+00015F6E  4E75                     504      rts
+00015F70                           505      
+00015F70                           506  SetScreenResolution:
+00015F70  103C 0021                507      move.b #TRAP_SET_OUTPUT_RESOLUTION,d0
+00015F74  223C 028001E0            508      move.l #(SCREEN_WIDTH<<16 + SCREEN_HEIGHT),d1
+00015F7A  4E4F                     509      trap #15
+00015F7C  4E75                     510      rts
+00015F7E                           511  
+00015F7E                           512  LoadConditionScreenFileData:
+00015F7E                           513  
+00015F7E                           514  
+00015F7E  2238 40DE                515      move.l WIN_PWIDTH_MEM_LOC,d1
+00015F82  4EB9 00015F14            516      jsr BigEndianToLittleEndian
+00015F88  5381                     517      subi.l #1,d1
+00015F8A  2601                     518      move.l d1,d3
+00015F8C  21C1 1062                519      move.l d1,(V_Win_ImageW)
+00015F90                           520      
+00015F90                           521      *Get image height (in pixels) into d4        
+00015F90  2238 40E2                522      move.l WIN_PHEIGHT_MEM_LOC,d1
+00015F94  4EB9 00015F14            523      jsr BigEndianToLittleEndian
+00015F9A  5381                     524      subi.l #1,d1
+00015F9C  2801                     525      move.l d1,d4
+00015F9E  21C1 105E                526      move.l d1,(V_Win_ImageH) 
+00015FA2                           527      
+00015FA2                           528      *Get bitdepth
+00015FA2  2238 40E8                529      move.l WIN_BITDEPTH_MEM_LOC,d1
+00015FA6  4EB9 00015F14            530      jsr BigEndianToLittleEndian
+00015FAC  82FC 0008                531      divu #8,d1
+00015FB0  21C1 1066                532      move.l d1,(V_Win_ImageBD)
+00015FB4                           533      
+00015FB4                           534      *Get image color data start location
+00015FB4  43F8 4102                535      lea WIN_COLOR_DATA_MEM_LOC,a1
+00015FB8  21C9 106A                536      move.l a1,(M_Win_DataSLocation)
+00015FBC                           537      
+00015FBC  2239 00009C06            538      move.l LOSE_PWIDTH_MEM_LOC,d1
+00015FC2  4EB9 00015F14            539      jsr BigEndianToLittleEndian
+00015FC8  5381                     540      subi.l #1,d1
+00015FCA  2601                     541      move.l d1,d3
+00015FCC  21C1 1072                542      move.l d1,(V_Lose_ImageW)
+00015FD0                           543      
+00015FD0                           544      *Get image height (in pixels) into d4        
+00015FD0  2239 00009C0A            545      move.l LOSE_PHEIGHT_MEM_LOC,d1
+00015FD6  4EB9 00015F14            546      jsr BigEndianToLittleEndian
+00015FDC  5381                     547      subi.l #1,d1
+00015FDE  2801                     548      move.l d1,d4
+00015FE0  21C1 106E                549      move.l d1,(V_Lose_ImageH) 
+00015FE4                           550      
+00015FE4                           551      *Get bitdepth
+00015FE4  2239 00009C10            552      move.l LOSE_BITDEPTH_MEM_LOC,d1
+00015FEA  4EB9 00015F14            553      jsr BigEndianToLittleEndian
+00015FF0  82FC 0008                554      divu #8,d1
+00015FF4  21C1 1076                555      move.l d1,(V_Lose_ImageBD)
+00015FF8                           556      
+00015FF8                           557      *Get image color data start location
+00015FF8  43F9 00009C2A            558      lea LOSE_COLOR_DATA_MEM_LOC,a1
+00015FFE  21C9 107A                559      move.l a1,(M_Lose_DataSLocation)
+00016002                           560        
+00016002  4E75                     561      rts
+00016004                           562  
+00016004                           563  LoadSpriteData:*
+00016004                           564  
+00016004  45F8 1042                565      lea ArrM_Sprite_Mem_Loc,a2
+00016008  47F8 1046                566      lea ArrV_Sprite_Dimensions,a3
+0001600C                           567      
+0001600C                           568      *Get image width (in pixels) into d3
+0001600C  2238 128E                569      move.l ARCHER_PWIDTH_MEM_LOC,d1
+00016010  4EB9 00015F14            570      jsr BigEndianToLittleEndian
+00016016  5381                     571      subi.l #1,d1
+00016018  2601                     572      move.l d1,d3
+0001601A  21C1 1082                573      move.l d1,(V_Archer_ImageW)
+0001601E                           574      *add to WIDTH the sprite dimensions array
+0001601E  26C1                     575      move.l d1,(a3)+ 
+00016020                           576      
+00016020                           577      *Get image height (in pixels) into d4        
+00016020  2238 1292                578      move.l ARCHER_PHEIGHT_MEM_LOC,d1
+00016024  4EB9 00015F14            579      jsr BigEndianToLittleEndian
+0001602A  5381                     580      subi.l #1,d1
+0001602C  2801                     581      move.l d1,d4
+0001602E  21C1 107E                582      move.l d1,(V_Archer_ImageH)
+00016032                           583      *add to HEIGHT the sprite dimensions array
+00016032  26C1                     584      move.l d1,(a3)+ 
+00016034                           585      
+00016034                           586      *Get bitdepth
+00016034  2238 1298                587      move.l ARCHER_BITDEPTH_MEM_LOC,d1
+00016038  4EB9 00015F14            588      jsr BigEndianToLittleEndian
+0001603E  82FC 0008                589      divu #8,d1
+00016042  21C1 1086                590      move.l d1,(V_Archer_ImageBD)
+00016046                           591      
+00016046                           592      *Get image color data start location
+00016046  43F8 12B2                593      lea ARCHER_COLOR_DATA_MEM_LOC,a1
+0001604A  21C9 108A                594      move.l a1,(M_Archer_DataSLocation)
+0001604E                           595      
+0001604E                           596      *add to the sprite mem array.
+0001604E  24C9                     597      move.l a1,(a2)+
+00016050                           598        
+00016050  4E75                     599      rts
+00016052                           600  
+00016052                           601  InitializeBallon:
+00016052                           602  
+00016052  11FC 0000 1106           603      move.b #0,(B_Balloon_Reached_MY) *Start the game by setting the balloon to move up 
+00016058  11FC 0001 110A           604      move.b #1,(B_Balloon_Reached_LY) *Start the game by telling the balloon to not move down
+0001605E                           605      
+0001605E                           606      *initialize velocity       
+0001605E  21FC 00000004 10FA       607      move.l  #BALLOON_INIT_VELOCITY,(V_Balloon_Velocity)
+00016066                           608      
+00016066                           609      *initialize LEFT-X and UPPER-Y spawn position of balloon
+00016066  43F8 10EA                610      lea V_Balloon_Current_LXPOS,a1
+0001606A  22BC 0000021C            611      move.l  #BALLOON_SPAWN_LEFT_X,(a1)
+00016070  43F8 10EE                612      lea V_Balloon_Current_UYPOS,a1
+00016074  22BC 00000168            613      move.l  #BALLOON_SPAWN_UPPER_Y,(a1)
+0001607A                           614  
+0001607A                           615      *initialize RIGHT-X and LOWER-Y spawn position of balloon
+0001607A  43F8 10F2                616      lea V_Balloon_Current_RXPOS,a1
+0001607E  22BC 00000244            617      move.l  #BALLOON_SPAWN_RIGHT_X,(a1)
+00016084  43F8 10F6                618      lea V_Balloon_Current_LYPOS,a1
+00016088  22BC 00000190            619      move.l  #BALLOON_SPAWN_LOWER_Y,(a1)
+0001608E                           620      
+0001608E                           621      *initialize color
+0001608E  21F8 11BA 1116           622      move.l (COLOR_TABLE),(V_Balloon_Color)
+00016094                           623      
+00016094                           624      *Set last ballon to false at the start of the program
+00016094  21FC 00000000 110E       625      move.l #0,(B_Last_Balloon)
+0001609C                           626      
+0001609C                           627      
+0001609C                           628          
+0001609C                           629  
+0001609C  4E75                     630      rts
+0001609E                           631  
+0001609E                           632  InitializeRock:
+0001609E                           633      
+0001609E                           634      *initialize LEFT-X and UPPER-Y spawn position of balloon
+0001609E  43F8 108E                635      lea V_Rock_Current_LXPOS,a1
+000160A2  22BC 0000004B            636      move.l  #ROCK_SPAWN_LEFT_X,(a1)
+000160A8  43F8 1092                637      lea V_Rock_Current_UYPOS,a1
+000160AC  22BC 00000190            638      move.l  #ROCK_SPAWN_UPPER_Y,(a1)
+000160B2                           639  
+000160B2                           640      *initialize RIGHT-X and LOWER-Y spawn position of balloon
+000160B2  43F8 1096                641      lea V_Rock_Current_RXPOS,a1
+000160B6  22BC 00000050            642      move.l  #ROCK_SPAWN_RIGHT_X,(a1)
+000160BC  43F8 109A                643      lea V_Rock_Current_LYPOS,a1
+000160C0  22BC 00000195            644      move.l  #ROCK_SPAWN_LOWER_Y,(a1)
+000160C6                           645      
+000160C6                           646      *initialize velocity     
+000160C6  21FC 00000014 109E       647      move.l #ROCK_INIT_VELOCITY,(V_Rock_X_Velocity)
+000160CE  21FC 00000014 10A2       648      move.l #ROCK_INIT_VELOCITY,(V_Rock_Y_Velocity)
+000160D6                           649  
+000160D6                           650          
+000160D6                           651  
+000160D6  4E75                     652      rts
+000160D8                           653  
+000160D8                           654  InitVarAndProcess:
+000160D8                           655      *Set Time Variables
+000160D8  21FC 00000000 1122       656      move.l #0,(PreviousTime)
+000160E0  21FC 00000000 111A       657      move.l #0,(SecondCounter)
+000160E8                           658      *Set angle of shot to 30 degrees ( 1- 3)
+000160E8  21FC 00000001 10CE       659      move.l #1,(AngleThetaOfShot)
+000160F0                           660      *Set is firing to false on start
+000160F0  21FC 00000000 113E       661      move.l #0,(B_FireKeyPressed)
+000160F8                           662      
+000160F8                           663      *Cosine and Sine Cumulative
+000160F8                           664      *Will be reset when the rock is removed.
+000160F8  21FC 00000000 10C6       665      move.l #0,(Cosine_Cumulative)
+00016100  21FC 00000000 10CA       666      move.l #0,(Sine_Cumulative)
+00016108                           667      
+00016108                           668      *Init Gravity
+00016108  21FC 00000001 10B6       669      move.l #GRAVITY,(Gravity_Cumulative)
+00016110  21FC 00000000 10BA       670      move.l #0,(Gravity_Frame_Count)
+00016118  21FC 00000000 10C2       671      move.l #0,(B_Velocity_Reverse)
+00016120                           672      
+00016120                           673      *Collision False
+00016120  21FC 00000000 1132       674      move.l #0,(B_CollisionOccured)
+00016128  21FC 00000001 1112       675      move.l #1,(V_Balloon_Collision_Counter)
+00016130                           676      
+00016130                           677      *set double buffered mode              
+00016130  103C 005C                678      move.b  #TRAP_DRAWING_MODE,d0          
+00016134  123C 0011                679      move.b  #TRAP_DBUFFER_MODE,d1
+00016138  4E4F                     680      trap    #15
+0001613A                           681      
+0001613A  21FC 0000004B 10DA       682      move.l #75,(V_FireLine_X_End_POS)
+00016142  21FC 00000190 10DE       683      move.l #400,(V_FireLine_Y_End_POS)
+0001614A                           684      
+0001614A  7008                     685      move.l #TRAP_GET_TIME,d0
+0001614C  4E4F                     686      trap #15
+0001614E                           687      
+0001614E  C2BC 00FFFFFF            688      and.l #%00000000111111111111111111111111,d1 *We only want to have 24 bits so we must clear the upper 8bits
+00016154                           689                                                  *Reason being that we want this number for colors and don't use the Alpha
+00016154  21C1 1142                690      move.l d1,(RandomSeedLFSR) 
+00016158                           691      
+00016158  4280                     692      clr.l d0
+0001615A  4281                     693      clr.l d1
+0001615C                           694      
+0001615C  21FC 00000004 1152       695      move.l #4,(SevenSegCounter1) *inner (FIRST PLACE)
+00016164  21FC 00000007 1156       696      move.l #7,(SevenSegCounter2) *outer (TENTHS PLACE)         
+0001616C                           697  
+0001616C  21FC 00000000 114E       698      move.l #0,(B_Screen_First_Print)
+00016174                           699  
+00016174  21FC 00000000 1146       700      move.l #0,(B_Is_Win)
+0001617C  21FC 00000000 114A       701      move.l #0,(B_Is_Lose)
+00016184                           702      
+00016184  4E75                     703      rts
+00016186                           704  
+00016186                           705  
+00016186                           706  LoadBackgroundPrint:
+00016186  4EB9 0001619A            707      jsr OpenBackgroundFile
+0001618C  4EB9 000161A8            708      jsr GatherBackgroundData
+00016192  4EB9 00016236            709      jsr PrintBackgroundImage
+00016198                           710      
+00016198  4E75                     711      rts
+0001619A                           712  
+0001619A                           713  OpenBackgroundFile:
+0001619A                           714      *Best practice to close all files first (in accordance to EASy68k file operations help section)
+0001619A  7032                     715      move.l #TRAP_CLOSE_ALL_FILES,d0
+0001619C  4E4F                     716      trap #15
+0001619E                           717  
+0001619E  43F8 124A                718      lea String_FileName,a1
+000161A2  7033                     719      move.l #TRAP_OPEN_EXISTING_FILE,d0
+000161A4  4E4F                     720      trap #15
+000161A6                           721      
+000161A6  4E75                     722      rts
+000161A8                           723  GatherBackgroundData:
+000161A8  4EB9 000161B6            724      jsr GetFIDGetBitdepth
+000161AE  4EB9 000161F4            725      jsr GetHeightandWidth   
+000161B4                           726  
+000161B4  4E75                     727      rts
+000161B6                           728      
+000161B6                           729  GetFIDGetBitdepth:
+000161B6                           730  
+000161B6                           731      *get file id
+000161B6  43F8 1162                732      lea FID,a1
+000161BA  2281                     733      move.l d1,(a1)
+000161BC                           734      
+000161BC                           735      *get bitdepth
+000161BC  7037                     736      move.l #TRAP_SET_READ_POSITION,d0
+000161BE  741C                     737      move.l #BACKGROUND_BITDEPTH_BYTE_READ,d2
+000161C0  4E4F                     738      trap #15
+000161C2                           739  
+000161C2  43F8 1166                740      lea Bitdepth,a1
+000161C6  143C 0002                741      move.b #2,d2
+000161CA  7035                     742      move.l #TRAP_READ_FILE ,d0
+000161CC  4E4F                     743      trap #15
+000161CE                           744      
+000161CE                           745      *transform bitdepth data to format we can use
+000161CE  2211                     746      move.l (a1),d1
+000161D0  4EB9 00015F14            747      jsr BigEndianToLittleEndian
+000161D6  C2BC 000000FF            748      and.l #%0000000011111111,d1    
+000161DC  22BC 00000003            749      move.l #3,(a1)    *Default bitdepth is 24 so set 3 BUT...
+000161E2                           750      
+000161E2  B27C 0020                751      cmp #32,d1 
+000161E6                           752      
+000161E6  6700 0004                753      beq Set32BitDepth *Check if the bitdepth is 32. Branch and set to 4
+000161EA                           754  
+000161EA  4E75                     755      rts               *Otherwise it stays 24 and return
+000161EC                           756  
+000161EC                           757  Set32BitDepth:
+000161EC  22BC 00000004            758      move.l #4,(a1)
+000161F2  4E75                     759      rts
+000161F4                           760  
+000161F4                           761  GetHeightandWidth:
+000161F4                           762  
+000161F4                           763      *height
+000161F4  2238 1162                764      move.l FID,d1
+000161F8                           765  
+000161F8  7037                     766      move.l #TRAP_SET_READ_POSITION,d0
+000161FA  7416                     767      move.l #BACKGROUND_HEIGHT_BYTE_OFFSET,d2
+000161FC  4E4F                     768      trap #15
+000161FE                           769  
+000161FE  43F8 104E                770      lea V_Background1_ImageH,a1
+00016202  143C 0004                771      move.b #4,d2
+00016206  7035                     772      move.l #TRAP_READ_FILE ,d0
+00016208  4E4F                     773      trap #15
+0001620A                           774  
+0001620A  2211                     775      move.l (a1),d1
+0001620C  4EB9 00015F14            776      jsr BigEndianToLittleEndian
+00016212  2281                     777      move.l d1,(a1)
+00016214                           778      
+00016214                           779      *Width
+00016214  2238 1162                780      move.l FID,d1
+00016218                           781  
+00016218  7037                     782      move.l #TRAP_SET_READ_POSITION,d0
+0001621A  7412                     783      move.l #BACKGROUND_WIDTH_BYTE_OFFSET,d2
+0001621C  4E4F                     784      trap #15
+0001621E                           785  
+0001621E  43F8 1052                786      lea V_Background1_ImageW,a1
+00016222  143C 0004                787      move.b #4,d2
+00016226  7035                     788      move.l #TRAP_READ_FILE ,d0
+00016228  4E4F                     789      trap #15
+0001622A                           790  
+0001622A  2211                     791      move.l (a1),d1
+0001622C  4EB9 00015F14            792      jsr BigEndianToLittleEndian
+00016232  2281                     793      move.l d1,(a1)
+00016234                           794      
+00016234  4E75                     795      rts 
+00016236                           796      
+00016236                           797  PrintBackgroundImage:
+00016236  4EB9 00016250            798      jsr SetBackgroundStartCoordinates
+0001623C  4EB9 00016262            799      jsr SetBackgroundDimensions
+00016242  4EB9 00016274            800      jsr SetBackgroundPrintCoordinates
+00016248  4EB9 00016288            801      jsr BeginBackgroundPrint
+0001624E  4E75                     802      rts
+00016250                           803  
+00016250                           804  SetBackgroundStartCoordinates:  
+00016250  21FC 00000000 116E       805      move.l #0,(CropStartXCoordinate)
+00016258  21FC 00000000 116A       806      move.l #0,(CropStartYCoordinate)
+00016260                           807      
+00016260  4E75                     808      rts
+00016262                           809      
+00016262                           810  SetBackgroundDimensions: 
+00016262                           811  
+00016262  2038 1052                812      move.l (V_Background1_ImageW),d0
+00016266  2238 104E                813      move.l (V_Background1_ImageH),d1
+0001626A  21C0 1176                814      move.l d0,(CropWidth)
+0001626E  21C1 1172                815      move.l d1,(CropHeight)
+00016272                           816      
+00016272  4E75                     817      rts
+00016274                           818  
+00016274                           819  
+00016274                           820  SetBackgroundPrintCoordinates:
+00016274  21FC 00000000 117E       821      move.l #0,(CropPrintXCoordinate)
+0001627C  7200                     822      move.l #0,d1
+0001627E  D2B8 1172                823      add.l (CropHeight),d1
+00016282  21C1 117A                824      move.l d1,(CropPrintYCoordinate)
+00016286                           825      
+00016286  4E75                     826      rts
+00016288                           827      
+00016288                           828  BeginBackgroundPrint:
+00016288  700B                     829      move.l #TRAP_CLEAR_SCREEN,d0
+0001628A  223C 0000FF00            830      move.l #$FF00,d1
+00016290  4E4F                     831      trap #15
+00016292                           832      
+00016292                           833      
+00016292  4EB9 000162DE            834      jsr GetBackgroundMemoryLocation
+00016298                           835      
+00016298  2238 1162                836      move.l FID,d1
+0001629C  7037                     837      move.l #TRAP_SET_READ_POSITION,d0
+0001629E  2438 1196                838      move.l ByteOffsetToBeginReadingCropData,d2
+000162A2  4E4F                     839      trap #15
+000162A4                           840      
+000162A4                           841  
+000162A4                           842      
+000162A4                           843      *d1 and d2 will be set to print positions for pixel printing task
+000162A4  2238 117E                844      move.l CropPrintXCoordinate,d1   
+000162A8  2438 117A                845      move.l CropPrintYCoordinate,d2
+000162AC                           846      
+000162AC  2C38 1176                847      move.l (CropWidth),d6 
+000162B0  DCB8 117E                848      add.l (CropPrintXCoordinate),d6 *d6 - Number of time the inner loop will iterate (inner loop counter)
+000162B4  2A38 1172                849      move.l (CropHeight),d5          *d5 - Number of times the outer loop will iterate (outer loop counter)
+000162B8                           850  
+000162B8                           851  ContinueBackgroundRow:
+000162B8                           852  
+000162B8  4EB9 00016D62            853      jsr FileRGBValueAndPrintPixel
+000162BE                           854  
+000162BE                           855  
+000162BE  5281                     856      addi.l #1,d1
+000162C0  B246                     857      cmp d6,d1
+000162C2  66F4                     858      bne ContinueBackgroundRow *Inner Loop
+000162C4                           859      
+000162C4                           860      
+000162C4  2F05                     861      move.l d5,-(sp)                       *save the outerloop counter
+000162C6  2F02                     862      move.l d2,-(sp)                       *Save the y-positioin
+000162C8                           863      
+000162C8                           864  
+000162C8  4EB9 00016336            865      jsr GetBackgroundReadOffset           *skip bytes to get to next readposition (uses registers d5 and d2)
+000162CE                           866      
+000162CE  2238 117E                867      move.l CropPrintXCoordinate,d1        *reset the x-coordinate
+000162D2                           868      
+000162D2  241F                     869      move.l (sp)+,d2                       *Save the y-positioin
+000162D4  2A1F                     870      move.l (sp)+,d5                       *save the outerloop counter
+000162D6                           871  
+000162D6                           872      
+000162D6  5382                     873      subi.l #1,d2
+000162D8                           874      
+000162D8  5385                     875      subi.l #1,d5
+000162DA                           876      
+000162DA  6EDC                     877      bgt ContinueBackgroundRow *Outer Loop
+000162DC                           878  
+000162DC  4E75                     879      rts
+000162DE                           880  GetBackgroundMemoryLocation:
+000162DE                           881  
+000162DE                           882      *calc the number of rows of pixels to skip to get to the crop y-coordinate
+000162DE  2438 104E                883      move.l (V_Background1_ImageH),d2
+000162E2  94B8 116A                884      sub.l (CropStartYCoordinate),d2
+000162E6  94B8 1172                885      sub.l (CropHeight),d2
+000162EA                           886      
+000162EA                           887      *d5 holds rows to skip
+000162EA                           888  
+000162EA  2E02                     889      move.l d2,d7                            *save d2 value
+000162EC                           890      
+000162EC  4EB9 00016352            891      jsr calcBackgroundPadding               
+000162F2                           892      
+000162F2  2407                     893      move.l d7,d2                            *restore d2 value
+000162F4                           894      
+000162F4  2238 1052                895      move.l (V_Background1_ImageW),d1
+000162F8  4EB9 00015F1C            896      jsr MULTIPLY_FUNCTION                   *d2 results with the number of pixels needed to be skipped from the total rows
+000162FE                           897                            
+000162FE  2238 116E                898      move.l (CropStartXCoordinate),d1
+00016302  D481                     899      add.l d1,d2                             *Adds the pixels that need to be traversed in the final row to reach the crop data
+00016304                           900      
+00016304  2238 1166                901      move.l Bitdepth,d1
+00016308  4EB9 00015F1C            902      jsr MULTIPLY_FUNCTION                   *d5 results with the number of bytes needed to be skipped to reach the crop data from the START of the image data
+0001630E                           903      
+0001630E  7236                     904      move.l #BACKGROUND_DATA_BYTE_OFFSET,d1    
+00016310  D481                     905      add.l d1,d2                             *We add the bytes in the header which will account for those bytes needed to get to the START of the image data.
+00016312                           906      
+00016312  D4B8 1182                907      add.l (TotalIntialBytePaddingOffset),d2 *Padding needs to be added for the rows that were skipped to get to the first byte of crop data
+00016316                           908                                              
+00016316                           909                                              *d5 now has the total number of bytes FROM THE START OF THE FILE (including any padding) to get to the beginning of the crop data
+00016316                           910                                              
+00016316  21C2 1196                911      move.l d2,(ByteOffsetToBeginReadingCropData)
+0001631A  21C2 119A                912      move.l d2,(CropReadOffsetCounter)
+0001631E                           913      
+0001631E                           914    
+0001631E                           915      *Calculates the number of bytes needed to skip to get to the next row of crop data (adds necessary padding)
+0001631E                           916      *Store that result in varible ByteToSkipForNextRead
+0001631E  2438 1052                917      move.l (V_Background1_ImageW),d2
+00016322  2238 1166                918      move.l Bitdepth,d1
+00016326  4EB9 00015F1C            919      jsr MULTIPLY_FUNCTION
+0001632C  D4B8 1186                920      add.l (BytePaddingOffset),d2
+00016330  21C2 1192                921      move.l d2,(BytesToSkipForNextRead)
+00016334                           922      
+00016334  4E75                     923      rts
+00016336                           924      
+00016336                           925  GetBackgroundReadOffset:
+00016336                           926      *set neaxt read position for the file
+00016336  2838 119A                927      move.l (CropReadOffsetCounter),d4
+0001633A  2A38 1192                928      move.l (BytesToSkipForNextRead),d5
+0001633E  D885                     929      add.l d5,d4
+00016340                           930      
+00016340  21C4 119A                931      move.l d4,(CropReadOffsetCounter) *Cumulative read offset
+00016344                           932      
+00016344  2238 1162                933      move.l FID,d1
+00016348  7037                     934      move.l #TRAP_SET_READ_POSITION,d0
+0001634A  2438 119A                935      move.l CropReadOffsetCounter,d2
+0001634E  4E4F                     936      trap #15
+00016350                           937  
+00016350  4E75                     938      rts
+00016352                           939      
+00016352                           940  CalcBackgroundPadding:
+00016352  2238 1052                941      move.l (V_Background1_ImageW),d1
+00016356  82FC 0004                942      divu #4,d1
+0001635A  E089                     943      lsr.l #8,d1
+0001635C  E089                     944      lsr.l #8,d1
+0001635E  21C1 1186                945      move.l d1,(BytePaddingOffset) 
+00016362                           946      
+00016362  4EB9 00015F1C            947      jsr MULTIPLY_FUNCTION
+00016368                           948   
+00016368  21C2 1182                949      move.l d2,(TotalIntialBytePaddingOffset)
+0001636C  4E75                     950      rts
+0001636E                           951  
+0001636E                           952  LoadCropData:
+0001636E                           953    *This information is preset so that when we draw we don't have to continuously set this information
+0001636E                           954    
+0001636E                           955    *Set Crop Start Coordinates
+0001636E  21FC 00000064 116E       956      move.l #100,(CropStartXCoordinate)
+00016376  21FC 00000000 116A       957      move.l #0,(CropStartYCoordinate)
+0001637E                           958  
+0001637E                           959    *Set Crop Dimensions
+0001637E  21FC 0000004B 1176       960      move.l #75,(CropWidth)
+00016386  21FC 00000032 1172       961      move.l #50,(CropHeight)
+0001638E                           962  
+0001638E                           963    *Set Crop Print Coordinates
+0001638E  21FC 00000064 117E       964      move.l #100,(CropPrintXCoordinate)
+00016396  7200                     965      move.l #0,d1
+00016398  D2B8 1172                966      add.l (CropHeight),d1
+0001639C  21C1 117A                967      move.l d1,(CropPrintYCoordinate)
+000163A0                           968      
+000163A0  4E75                     969      rts
+000163A2                           970  
+000163A2                           971  
+000163A2                           972  
+000163A2                           973  
+000163A2                           974  
+000163A2                           975  
+000163A2                           976  
+000163A2                           977  
+000163A2                           978  
+000163A2                           979  
+000163A2                           980  
+000163A2                           981  
+000163A2                           982  
+000163A2                           983  
+000163A2                           984  
+000163A2                           985  
+000163A2                           986  
+000163A2                           987  
+000163A2                           988  -------------------- end include --------------------
+000163A2                           989      INCLUDE "GetInput.x68"
+000163A2                           990  GetInput:
+000163A2                           991      
+000163A2  4EB9 000163B0            992      jsr clearRegisters
+000163A8  4EB9 000163E6            993      jsr GetKeyPresses
+000163AE  4E75                     994      rts
+000163B0                           995  
+000163B0                           996  clearRegisters:
+000163B0  4280                     997      clr.l d0
+000163B2  4281                     998      clr.l d1
+000163B4  4282                     999      clr.l d2
+000163B6  4283                    1000      clr.l d3
+000163B8  4284                    1001      clr.l d4
+000163BA  4285                    1002      clr.l d5
+000163BC  4286                    1003      clr.l d6
+000163BE  4287                    1004      clr.l d7
+000163C0  227C 00000000           1005      move.l #0,a1
+000163C6  247C 00000000           1006      move.l #0,a2
+000163CC  267C 00000000           1007      move.l #0,a3
+000163D2  287C 00000000           1008      move.l #0,a4
+000163D8  2A7C 00000000           1009      move.l #0,a5
+000163DE  2C7C 00000000           1010      move.l #0,a6
+000163E4                          1011      
+000163E4  4E75                    1012      rts
+000163E6                          1013    
+000163E6                          1014  GetKeyPresses:
+000163E6                          1015                                      *A will be arcing the bow up and to the left
+000163E6                          1016                                      *B will be arcing the bow down and to the right
+000163E6                          1017                                      *F is to fire the arrow
+000163E6  0C78 0001 113E          1018      cmp #1,(B_FireKeyPressed)
+000163EC  6700 0080               1019      beq NoKeyboardInput             *If the sling has been fired then don't take in inputs    
+000163F0  103C 0013               1020      move.b #TRAP_GET_PRESSED_KEY,D0 
+000163F4  223C 00414446           1021      move.l #('A'<<16+'D'<<8+'F'),D1 *check for keypress (a,d) A is 00FF0000, D is 0000FF00 and F is 000000FF
+000163FA  4E4F                    1022      trap  #15
+000163FC  2401                    1023      move.l d1,d2
+000163FE  0282 00FF0000           1024      andi.l #$00FF0000,d2
+00016404  6600 001E               1025      bne UpKeyPressed
+00016408                          1026      
+00016408  2401                    1027      move.l d1,d2
+0001640A  0282 0000FF00           1028      andi.l #$0000FF00,d2
+00016410  6600 0028               1029      bne DownKeyPressed
+00016414                          1030      
+00016414  2401                    1031      move.l d1,d2
+00016416  0282 000000FF           1032      andi.l #$000000FF,d2
+0001641C  6600 0032               1033      bne FireKeyPressed
+00016420  2401                    1034      move.l d1,d2
+00016422                          1035      
+00016422  4E75                    1036      rts
+00016424                          1037  
+00016424                          1038  UpKeyPressed:
+00016424  2038 10CE               1039     move.l (AngleThetaOfShot),d0
+00016428  0C80 00000002           1040     cmpi.l #2,d0
+0001642E  6700 0040               1041     beq ClampKeyPress
+00016432  5280                    1042     addi.l #1,d0
+00016434  21C0 10CE               1043     move.l d0,(AngleThetaOfShot)
+00016438  4E75                    1044     rts
+0001643A                          1045      
+0001643A                          1046  DownKeyPressed:
+0001643A  2038 10CE               1047      move.l (AngleThetaOfShot),d0
+0001643E  0C80 00000000           1048      cmpi.l #0,d0
+00016444  6700 002A               1049      beq ClampKeyPress
+00016448  5380                    1050      subi.l #1,d0
+0001644A  21C0 10CE               1051      move.l d0,(AngleThetaOfShot)
+0001644E                          1052      *display x
+0001644E                          1053      
+0001644E  4E75                    1054      rts
+00016450                          1055  FireKeyPressed:
+00016450  2038 113E               1056      move.l (B_FireKeyPressed),d0
+00016454  B07C 0001               1057      cmp #1,d0
+00016458  6700 0014               1058      beq NoKeyboardInput
+0001645C                          1059      
+0001645C  7049                    1060      move.l #TRAP_PLAY_WAV_SOUND,d0 *PLAY SOUND
+0001645E  43F8 126D               1061      lea String_Throw_Sound,a1
+00016462  4E4F                    1062      trap #15
+00016464                          1063      
+00016464  21FC 00000001 113E      1064      move.l #1,(B_FireKeyPressed)   *Set to true
+0001646C  4E75                    1065      rts
+0001646E                          1066  
+0001646E                          1067  NoKeyboardInput:
+0001646E  4E75                    1068      rts
+00016470                          1069      
+00016470                          1070  ClampKeyPress
+00016470  4E75                    1071      rts
+00016472                          1072  
+00016472                          1073  
+00016472                          1074  
+00016472                          1075  
+00016472                          1076  
+00016472                          1077  
+00016472                          1078  
+00016472                          1079  
+00016472                          1080  
+00016472                          1081  
+00016472                          1082  
+00016472                          1083  
+00016472                          1084  
+00016472                          1085  
+00016472                          1086  
+00016472                          1087  
+00016472                          1088  -------------------- end include --------------------
+00016472                          1089      INCLUDE "UpdateGame.x68"
+00016472                          1090  UpdateGame:
+00016472                          1091      
+00016472  4EB9 000164A6           1092      jsr GetDeltaTime                            *MUST BE FIRST SUBROUTINE TO RUN
+00016478  4EB9 0001685A           1093      jsr RandomColorLFSR
+0001647E  4EB9 0001656C           1094      jsr SetCosSin
+00016484  4EB9 000165A8           1095      jsr UpdateFireLine
+0001648A  4EB9 00016510           1096      jsr UpdateBallon
+00016490  4EB9 000165EA           1097      jsr UpdateRock
+00016496  4EB9 000166D6           1098      jsr CheckIfRockCollided  
+0001649C  4EB9 000168AA           1099      jsr CalcWhichSevSeg
+000164A2                          1100      
+000164A2  4E75                    1101      rts
+000164A4                          1102      
+000164A4                          1103  DontUpdate:
+000164A4  4E75                    1104      rts 
+000164A6                          1105      
+000164A6                          1106  GetDeltaTime:
+000164A6  7008                    1107      move.l #TRAP_GET_TIME,d0                    *Get NEW CurrentTime into d1
+000164A8  4E4F                    1108      trap #15
+000164AA  21FC 00000000 112A      1109      move.l #0,(TimeUpdateBool)                  *Set FALSE
+000164B2  21FC 00000000 112E      1110      move.l #0,(B_Second_Passed)                 *Set FALSE
+000164BA  2401                    1111      move.l d1,d2                                *Save Current Time
+000164BC  2601                    1112      move.l d1,d3                                *Save Current Time
+000164BE                          1113      
+000164BE  96B8 111A               1114      sub.l (SecondCounter),d3
+000164C2                          1115      
+000164C2  92B8 1122               1116      sub.l (PreviousTime),d1                     *subtract the previoius time from the current time
+000164C6                          1117                                                  *Example PT = 3, CT = 5, thus...(5 - 3) = 2 <-- delta time
+000164C6                          1118                                                  *d1 has delta time
+000164C6  0C83 00000064           1119      cmpi.l #100,d3
+000164CC  6D00 000E               1120      blt SkipSecondBoolSet
+000164D0  21FC 00000001 112E      1121      move.l #1,(B_Second_Passed)                 *set true
+000164D8  21C2 111A               1122      move.l d2,(SecondCounter)                   *set second counter
+000164DC                          1123  SkipSecondBoolSet
+000164DC                          1124                                   
+000164DC  0C81 00000001           1125      cmpi.l #FRAME_UPDATE_RATE,d1
+000164E2  6D00 0018               1126      blt ReachUpdateRate
+000164E6                          1127  
+000164E6                          1128  TimeUpdateRateReached:    
+000164E6  21C2 1122               1129      move.l d2,(PreviousTime)                    *Set the new previous time
+000164EA  21FC 00000001 112A      1130      move.l #1,(TimeUpdateBool)                  *Set TRUE
+000164F2                          1131      
+000164F2  7200                    1132      move.l #0,d1 
+000164F4  7400                    1133      move.l #0,d2 
+000164F6  7600                    1134      move.l #0,d3
+000164F8  7800                    1135      move.l #0,d4
+000164FA  4E75                    1136      rts
+000164FC                          1137  
+000164FC                          1138  ReachUpdateRate:
+000164FC                          1139                                                  *d1 holds delta time. It has not meet our FRAME_UPDATE_RATE
+000164FC  7601                    1140      move.l #FRAME_UPDATE_RATE,d3
+000164FE  9681                    1141      sub.l d1,d3                                 *d3 will hold the difference in time that needs to pass to get to the target FRAME_UPDATE_RATE
+00016500                          1142  LoopTimer:
+00016500                          1143        
+00016500  7008                    1144      move.l #TRAP_GET_TIME,d0                    *Get NEW CurrentTime into d1
+00016502  4E4F                    1145      trap #15
+00016504  2801                    1146      move.l d1,d4                                *save new current time
+00016506  9282                    1147      sub.l d2,d1
+00016508  B243                    1148      cmp d3,d1
+0001650A  6FF4                    1149      ble LoopTimer
+0001650C                          1150      
+0001650C                          1151      
+0001650C  2404                    1152      move.l d4,d2                                *d4 holds the current time and it needs to be passed to d2 because                                               
+0001650E                          1153                                                  *The TimeUpdateRateRached function uses d2 to store the current time as previous time
+0001650E  4E75                    1154      rts
+00016510                          1155      
+00016510                          1156  
+00016510                          1157  UpdateBallon:
+00016510  0CB8 00000001 112A      1158      cmpi.l #1,(TimeUpdateBool)                  *is the update bool set to true?
+00016518  668A                    1159      bne DontUpdate                              *If not true then DONT update
+0001651A                          1160      
+0001651A                          1161                                                  *start by moving up
+0001651A  2A38 10FA               1162      move.l (V_Balloon_Velocity),d5
+0001651E  2C38 10EE               1163      move.l (V_Balloon_Current_UYPOS),d6
+00016522  0C46 0064               1164      cmpi #100,d6
+00016526  6F00 000C               1165      ble BallonMaxHeight
+0001652A  BC7C 0064               1166      cmp #100,d6
+0001652E  6E00 000A               1167      bgt BalloonRise
+00016532  4E75                    1168      rts
+00016534                          1169  
+00016534                          1170  BallonMaxHeight:
+00016534  11FC 0001 1106          1171      move.b #1,(B_Balloon_Reached_MY)            *REACHED THE TOP   
+0001653A                          1172  BalloonRise:
+0001653A  0C38 0001 1106          1173      cmpi.b #1,(B_Balloon_Reached_MY)            *if reached the rop then DON'T sub
+00016540  6700 000C               1174      beq BallonFall
+00016544  9BB8 10EE               1175      sub.l d5,(V_Balloon_Current_UYPOS)          *Upper Y
+00016548  9BB8 10F6               1176      sub.l d5,(V_Balloon_Current_LYPOS)          *Lower Y
+0001654C                          1177      
+0001654C  4E75                    1178      rts
+0001654E                          1179      
+0001654E                          1180  BallonFall:
+0001654E  DBB8 10EE               1181      add.l d5,(V_Balloon_Current_UYPOS)          *Upper Y
+00016552  DBB8 10F6               1182      add.l d5,(V_Balloon_Current_LYPOS)          *Lower Y
+00016556                          1183      
+00016556  2C38 10F6               1184      move.l (V_Balloon_Current_LYPOS),d6
+0001655A  BC7C 0190               1185      cmp #400,d6
+0001655E  6E00 0004               1186      bgt BalloonLowest
+00016562                          1187      
+00016562  4E75                    1188      rts
+00016564                          1189  
+00016564                          1190     
+00016564                          1191  BalloonLowest
+00016564  11FC 0000 1106          1192      move.b #0,(B_Balloon_Reached_MY)            *REACHED THE TOP 
+0001656A  4E75                    1193      rts
+0001656C                          1194   
+0001656C                          1195  
+0001656C                          1196  SetCosSin:
+0001656C  2038 113E               1197      move.l (B_FireKeyPressed),d0
+00016570  B07C 0000               1198      cmp #0,d0                                   *If the fire button HAS been pressed then DON'T UPDATE
+00016574  6600 FF2E               1199      bne DontUpdate
+00016578                          1200      
+00016578  2038 10CE               1201      move.l (AngleThetaOfShot),d0  
+0001657C                          1202      
+0001657C  43F8 11A2               1203      lea COS_TABLE,a1
+00016580  45F8 11A8               1204      lea SIN_TABLE,a2
+00016584  47F8 11AE               1205      lea VELOCITY_TABLE,a3
+00016588                          1206      
+00016588                          1207  TraverseCosSinTables:    
+00016588  3219                    1208      move.w (a1)+,d1
+0001658A  341A                    1209      move.w (a2)+,d2
+0001658C  261B                    1210      move.l (a3)+,d3
+0001658E  5380                    1211      subi.l #1,d0
+00016590  B07C 0000               1212      cmp #0,d0
+00016594  6CF2                    1213      bge TraverseCosSinTables
+00016596                          1214      
+00016596                          1215      
+00016596  21C1 10D6               1216      move.l d1,(CosineOfAngle)
+0001659A  21C2 10D2               1217      move.l d2,(SineOfAngle)
+0001659E  21C3 109E               1218      move.l d3,(V_Rock_X_Velocity)
+000165A2  21C3 10A2               1219      move.l d3,(V_Rock_Y_Velocity)
+000165A6                          1220      
+000165A6  4E75                    1221      rts
+000165A8                          1222  
+000165A8                          1223  
+000165A8                          1224  UpdateFireLine:
+000165A8  2038 113E               1225      move.l (B_FireKeyPressed),d0
+000165AC  B07C 0000               1226      cmp #0,d0                                   *If the fire button HAS been pressed then DON'T UPDATE
+000165B0  6600 FEF2               1227      bne DontUpdate
+000165B4                          1228      
+000165B4                          1229                                                  *Begin Fractional Bit use*
+000165B4                          1230                                                  *We are using three fractional bits to represent Cosine and Sine
+000165B4                          1231      
+000165B4                          1232                                                  *Calculate Cosine
+000165B4                          1233                                                  *d1 is # of units to move, d2 is Cosine
+000165B4                          1234      
+000165B4  2802                    1235      move.l d2,d4                                *store the Sine value in d2 into d4 for later use
+000165B6                          1236                                                  *The multiply function requires that d2 hold the value we wish to multiply
+000165B6  2401                    1237      move.l d1,d2                                *place cosine into d2
+000165B8  721E                    1238      move.l #FIRE_LINE_LENGTH,d1                 *place the number of times to multiply into d1
+000165BA  4EB9 00015F1C           1239      jsr MULTIPLY_FUNCTION                       *d2 will hold the product of the multiplaction function
+000165C0                          1240                            
+000165C0  E68A                    1241      lsr.l #3,d2                                 *Shift for fractional bit manipulation
+000165C2                          1242      
+000165C2  724B                    1243      move.l #PFIRE_LINE_ORG_X,d1
+000165C4  D282                    1244      add.l d2,d1
+000165C6  43F8 10DA               1245      lea V_FireLine_X_End_POS,a1  
+000165CA  21C1 10DA               1246      move.l d1,(V_FireLine_X_End_POS)            *Store X position of FireLine
+000165CE                          1247      
+000165CE                          1248                                                  *Calculate Sine
+000165CE                          1249      
+000165CE  2404                    1250      move.l d4,d2                                *place the saved Sine value into d2
+000165D0  721E                    1251      move.l #FIRE_LINE_LENGTH,d1
+000165D2  4EB9 00015F1C           1252      jsr MULTIPLY_FUNCTION                       *d2 will hold the new value
+000165D8                          1253      
+000165D8  E68A                    1254      lsr.l #3,d2
+000165DA  223C 00000190           1255      move.l #PFIRE_LINE_ORG_Y,d1
+000165E0  9282                    1256      sub.l d2,d1
+000165E2  43F8 10DE               1257      lea V_FireLine_Y_End_POS,a1
+000165E6  21C1 10DE               1258      move.l d1,(V_FireLine_Y_End_POS)            *Store Y position of FireLine
+000165EA                          1259      
+000165EA                          1260  UpdateRock:
+000165EA  2038 113E               1261      move.l (B_FireKeyPressed),d0
+000165EE  B07C 0001               1262      cmp #1,d0                                   *If the fire button HAS NOT been pressed then DON'T UPDATE
+000165F2  6600 FEB0               1263      bne DontUpdate
+000165F6                          1264      
+000165F6                          1265                                                  *save Y positions for reverse velocity applications
+000165F6  2A38 109A               1266      move.l (V_Rock_Current_LYPOS),d5
+000165FA  2C38 1092               1267      move.l (V_Rock_Current_UYPOS),d6
+000165FE                          1268      
+000165FE                          1269                                                  *Reset positions for new calculation
+000165FE                          1270      
+000165FE  21FC 0000004B 108E      1271      move.l #ROCK_SPAWN_LEFT_X,(V_Rock_Current_LXPOS)
+00016606  21FC 00000050 1096      1272      move.l #ROCK_SPAWN_RIGHT_X,(V_Rock_Current_RXPOS)
+0001660E                          1273      
+0001660E  21FC 00000195 109A      1274      move.l #ROCK_SPAWN_LOWER_Y,(V_Rock_Current_LYPOS)
+00016616  21FC 00000190 1092      1275      move.l #ROCK_SPAWN_UPPER_Y,(V_Rock_Current_UYPOS)
+0001661E                          1276        
+0001661E                          1277     
+0001661E                          1278               
+0001661E  2438 10D6               1279      move.l (CosineOfAngle),d2       
+00016622                          1280      
+00016622  2238 109E               1281      move.l (V_Rock_X_Velocity),d1               *multiply the Cosine with the velocity will yield the the displacement of pixels to be moved in the update
+00016626  4EB9 00015F1C           1282      jsr MULTIPLY_FUNCTION                       *d2 will hold the product of the multiplaction function
+0001662C                          1283      
+0001662C  D4B8 10C6               1284      add.l (Cosine_Cumulative),d2                *add cumulative value (is 0 on first run)
+00016630  21C2 10C6               1285      move.l d2,(Cosine_Cumulative)               *Save cumulative value
+00016634                          1286                            
+00016634  E68A                    1287      lsr.l #3,d2                                 *Shift for fractional bit manipulation
+00016636                          1288                                                  *d2 now holds the displacement of pixels 
+00016636                          1289                            
+00016636                          1290                                                  *apply displacement to both X positions of the rock Left and Right
+00016636                          1291      
+00016636  D5B8 108E               1292      add.l d2,(V_Rock_Current_LXPOS)       
+0001663A  D5B8 1096               1293      add.l d2,(V_Rock_Current_RXPOS)      
+0001663E                          1294      
+0001663E                          1295                                                  *Apply gravity every certain interval of frames
+0001663E  0CB8 0000000A 10BA      1296      cmpi.l #GRAVITY_FRAME_COUNTER,(Gravity_Frame_Count)
+00016646  6F00 0042               1297      ble SkipGravityApplication
+0001664A                          1298      
+0001664A                          1299                                                  *Check to see if we are applying Velocity in the opposite direction
+0001664A  2238 10C2               1300      move.l (B_Velocity_Reverse),d1
+0001664E  B27C 0001               1301      cmp #1,d1
+00016652  6700 001E               1302      beq ApplyReverseVelocity
+00016656                          1303      
+00016656                          1304      
+00016656                          1305                                                  **APPLY GRAVITY AS USUAL**
+00016656  2238 10A2               1306      move.l (V_Rock_Y_Velocity),d1
+0001665A  5381                    1307      sub.l #GRAVITY,d1                           *LOWER velocity
+0001665C  21C1 10A2               1308      move.l d1, (V_Rock_Y_Velocity)              *Place current velocity into into variable
+00016660                          1309      
+00016660                          1310      
+00016660                          1311                                                  *Check to see if velocity has reached 0 because then we must apply velocity in the opposite direction.
+00016660  4EB9 000166C2           1312      jsr CheckReverseVelocity *Will check if the boolian B_Velocity_Reverse is to be set true. IF SO THEN VELOCITY REVERSED
+00016666  2238 10C2               1313      move.l (B_Velocity_Reverse),d1
+0001666A  B27C 0000               1314      cmp #0,d1 *This compare is used to skip the ApplyReverVelocity section
+0001666E  6700 001A               1315      beq SkipGravityApplication
+00016672                          1316      
+00016672                          1317  ApplyReverseVelocity:
+00016672                          1318      **Reverse Gravity**
+00016672  2238 10A2               1319      move.l (V_Rock_Y_Velocity),d1
+00016676  5281                    1320      addi.l #GRAVITY,d1 *INCREASE velocity
+00016678  21C1 10A2               1321      move.l d1, (V_Rock_Y_Velocity) *Place current velocity into into variable
+0001667C  2401                    1322      move.l d1,d2
+0001667E  2238 10C2               1323      move.l (B_Velocity_Reverse),d1    
+00016682  B27C 0001               1324      cmp #1,d1
+00016686  6700 0028               1325      beq ApplyReverseYChangeRock
+0001668A                          1326  SkipGravityApplication:
+0001668A                          1327         
+0001668A  2438 10D2               1328      move.l (SineOfAngle),d2
+0001668E  2238 10A2               1329      move.l (V_Rock_Y_Velocity),d1               *multiply the Sine with the velocity will yield the displacement of pixels to be moved in the update
+00016692                          1330      
+00016692                          1331      
+00016692  4EB9 00015F1C           1332      jsr MULTIPLY_FUNCTION                       *d2 will hold the product of the multiplaction function
+00016698                          1333      
+00016698  D4B8 10CA               1334      add.l (Sine_Cumulative),d2                  *add cumulative value (is 0 on first run)
+0001669C  21C2 10CA               1335      move.l d2,(Sine_Cumulative)                 *Save cumulative value
+000166A0                          1336                            
+000166A0  E68A                    1337      lsr.l #3,d2                                 *Shift for fractional bit manipulation
+000166A2                          1338                                                  *d2 now holds the displacement of pixels
+000166A2                          1339                                      
+000166A2                          1340  
+000166A2                          1341  ApplyYChangeRock:
+000166A2  52B8 10BA               1342      addi.l #1,(Gravity_Frame_Count)    
+000166A6  95B8 109A               1343      sub.l d2,(V_Rock_Current_LYPOS)       
+000166AA  95B8 1092               1344      sub.l d2,(V_Rock_Current_UYPOS) 
+000166AE                          1345      
+000166AE  4E75                    1346      rts
+000166B0                          1347  ApplyReverseYChangeRock:
+000166B0  52B8 10BA               1348      addi.l #1,(Gravity_Frame_Count)
+000166B4                          1349      
+000166B4  DA82                    1350      add.l d2,d5       
+000166B6  DC82                    1351      add.l d2,d6
+000166B8  21C5 109A               1352      move.l d5,(V_Rock_Current_LYPOS)       
+000166BC  21C6 1092               1353      move.l d6,(V_Rock_Current_UYPOS)
+000166C0  4E75                    1354      rts
+000166C2                          1355      
+000166C2                          1356  CheckReverseVelocity
+000166C2                          1357     
+000166C2  B27C 0000               1358      cmp #0,d1                                   *Check to see if gravity is equal to 0
+000166C6  6700 0004               1359      beq setReverse                              *if it is we must begin reversing velocity
+000166CA  4E75                    1360      rts
+000166CC                          1361  SetReverse:
+000166CC  21FC 00000001 10C2      1362      move.l #1,(B_Velocity_Reverse)              *Once the rock is deleted this needs to be reset
+000166D4  4E75                    1363      rts
+000166D6                          1364      
+000166D6                          1365  
+000166D6                          1366      
+000166D6                          1367  CheckIfRockCollided:
+000166D6  21FC 00000001 1132      1368      move.l #1,(B_CollisionOccured)              *Set Collision to False at the begining of the check
+000166DE                          1369      
+000166DE  4EB9 000166F8           1370      jsr CheckIfBalloonCollision
+000166E4                          1371      
+000166E4                          1372                                                  *If Rock already collided then skip wall and floor collisions and return
+000166E4  2238 1132               1373      move.l (B_CollisionOccured),d1
+000166E8  B27C 0004               1374      cmp #4,d1
+000166EC  6700 0008               1375      beq returnFromCollisionCheck
+000166F0  4EB9 00016744           1376      jsr CheckIfWallCollision
+000166F6                          1377  
+000166F6                          1378  returnFromCollisionCheck:    
+000166F6  4E75                    1379      rts
+000166F8                          1380  
+000166F8                          1381  CheckIfBalloonCollision:
+000166F8  7600                    1382      move.l #0,d3
+000166FA                          1383      
+000166FA  2038 1096               1384      move.l (V_Rock_Current_RXPOS),d0
+000166FE  2238 10EA               1385      move.l (V_Balloon_Current_LXPOS),d1
+00016702                          1386      
+00016702  B280                    1387      cmp.l d0,d1                         
+00016704                          1388                                       *Rock.max.x < Ballon.min.x
+00016704  6E00 0004               1389      bgt ROCK_BALLOON_CollisionCheck2 *Branch if the Ballon min X is GREATER than the Rock max X 
+00016708                          1390                                       *DEFINETLY NOT TOUCHING IF THIS IS THE CASE
+00016708                          1391      
+00016708  5283                    1392      addi.l #1,d3 *If the check fails add 1 to d3
+0001670A                          1393      
+0001670A                          1394  ROCK_BALLOON_CollisionCheck2:
+0001670A                          1395      
+0001670A  2038 10F2               1396      move.l (V_Balloon_Current_RXPOS),d0
+0001670E  2238 108E               1397      move.l (V_Rock_Current_LXPOS),d1
+00016712                          1398     
+00016712  B280                    1399      cmp.l d0,d1                      *Ballon.max.x < Rock.min.x
+00016714  6E00 0004               1400      bgt ROCK_BALLOON_CollisionCheck3 *Branch if the Rock min X is GREATER than the Balloon max X
+00016718                          1401                                       *DEFINETLY NOT TOUCHING IF THIS IS THE CASE
+00016718                          1402                                       
+00016718  5283                    1403      addi.l #1,d3 *If the check fails add 1 to d3
+0001671A                          1404  ROCK_BALLOON_CollisionCheck3:
+0001671A                          1405  
+0001671A  2038 1092               1406      move.l (V_Rock_Current_UYPOS),d0
+0001671E  2238 10F6               1407      move.l (V_Balloon_Current_LYPOS),d1
+00016722                          1408      
+00016722  B280                    1409      cmp.l d0,d1                      *Rock.max.y < Ballon.min.y
+00016724  6D00 0004               1410      blt ROCK_BALLOON_CollisionCheck4 *Branch if the Balloon lower Y is GREATER than the Rock upper Y
+00016728                          1411                                       *DEFINETLY NOT TOUCHING IF THIS IS THE CASE
+00016728                          1412                                       
+00016728  5283                    1413      addi.l #1,d3 *If the check fails add 1 to d3
+0001672A                          1414      
+0001672A                          1415  ROCK_BALLOON_CollisionCheck4: 
+0001672A  2038 10EE               1416      move.l (V_Balloon_Current_UYPOS),d0
+0001672E  2238 109A               1417      move.l (V_Rock_Current_LYPOS),d1
+00016732                          1418  
+00016732  B280                    1419      cmp.l d0,d1                      *Ballon.max.y < Rock.min.y
+00016734  6D00 0004               1420      blt Finish_Checks                *Branch if the Rock lower Y is GREATER than the Balloon upper Y
+00016738                          1421                                       
+00016738                          1422  
+00016738  5283                    1423      addi.l #1,d3 *If the check fails add 1 to d3
+0001673A                          1424      
+0001673A                          1425  Finish_Checks:
+0001673A  B67C 0004               1426      cmp #4,d3 *IF ALL CHECKS FAIL THEN WE HAVE A COLLISSION. RESULT IN D3 WILL THUS BE 4
+0001673E  6700 001E               1427      beq BalloonCollisionDetected
+00016742  4E75                    1428      rts
+00016744                          1429      
+00016744                          1430  CheckIfWallCollision
+00016744  2238 1096               1431      move.l (V_Rock_Current_RXPOS),d1
+00016748  B27C 0249               1432      cmp #585,d1  
+0001674C                          1433      
+0001674C  6E00 0082               1434      bgt WallCollisionDetected
+00016750                          1435      
+00016750  2238 109A               1436      move.l (V_Rock_Current_LYPOS),d1
+00016754  B27C 01A9               1437      cmp #425,d1
+00016758  6E00 0076               1438      bgt WallCollisionDetected
+0001675C                          1439      
+0001675C  4E75                    1440      rts
+0001675E                          1441      
+0001675E                          1442  BalloonCollisionDetected:
+0001675E                          1443  
+0001675E  7049                    1444      move.l #TRAP_PLAY_WAV_SOUND,d0
+00016760  43F8 125F               1445      lea String_BallonPop_Sound,a1
+00016764  4E4F                    1446      trap #15
+00016766                          1447      
+00016766  21FC 00000001 1132      1448      move.l #1,(B_CollisionOccured)              *Set Collision to true
+0001676E  21FC 00000000 113E      1449      move.l #0,(B_FireKeyPressed)                *Enable firing AND stop rock updates
+00016776  52B8 1112               1450      addi.l #1,(V_Balloon_Collision_Counter)     *Increment Collision counter
+0001677A  2038 1112               1451      move.l (V_Balloon_Collision_Counter),d0     *Load collision counter into a register
+0001677E                          1452      
+0001677E  B07C 0007               1453      cmp #7,d0
+00016782  6700 011C               1454      beq WinState
+00016786  B07C 0006               1455      cmp #6,d0                                   *Check if collision counter is equal to final ballon.
+0001678A  6700 0028               1456      beq SetLastBalloon                          
+0001678E                          1457      
+0001678E                          1458           
+0001678E                          1459      
+0001678E  43F8 11BA               1460      lea COLOR_TABLE,a1
+00016792                          1461  TraverseColorTable:                             *Set the correct color
+00016792  2219                    1462      move.l (a1)+,d1
+00016794  5300                    1463      subi.b #1,d0
+00016796  B07C 0000               1464      cmp #0,d0
+0001679A  6EF6                    1465      bgt TraverseColorTable
+0001679C  21C1 1116               1466      move.l d1,(V_Balloon_Color)
+000167A0  4EB9 000167F4           1467      jsr ResetRockPosition
+000167A6  4EB9 00016816           1468      jsr ResetGravityVariables
+000167AC  4EB9 00016830           1469      jsr ResetSineCosineAngle
+000167B2  4E75                    1470      rts
+000167B4                          1471  SetLastBalloon:
+000167B4  21FC 00000001 110E      1472      move.l #1,(B_Last_Balloon)
+000167BC  4EB9 000167F4           1473      jsr ResetRockPosition
+000167C2  4EB9 00016816           1474      jsr ResetGravityVariables
+000167C8  4EB9 00016830           1475      jsr ResetSineCosineAngle
+000167CE  4E75                    1476      rts
+000167D0                          1477      
+000167D0                          1478  WallCollisionDetected:
+000167D0  21FC 00000001 1132      1479      move.l #1,(B_CollisionOccured)
+000167D8  21FC 00000000 113E      1480      move.l #0,(B_FireKeyPressed)                *Enable firing AND stop rock updates
+000167E0  4EB9 000167F4           1481      jsr ResetRockPosition 
+000167E6  4EB9 00016816           1482      jsr ResetGravityVariables
+000167EC  4EB9 00016830           1483      jsr ResetSineCosineAngle
+000167F2  4E75                    1484      rts
+000167F4                          1485  
+000167F4                          1486  
+000167F4                          1487  
+000167F4                          1488  ResetRockPosition:
+000167F4  21FC 0000004B 108E      1489      move.l #ROCK_SPAWN_LEFT_X,(V_Rock_Current_LXPOS)
+000167FC  21FC 00000050 1096      1490      move.l #ROCK_SPAWN_RIGHT_X,(V_Rock_Current_RXPOS)
+00016804  21FC 00000195 109A      1491      move.l #ROCK_SPAWN_LOWER_Y,(V_Rock_Current_LYPOS)
+0001680C  21FC 00000190 1092      1492      move.l #ROCK_SPAWN_UPPER_Y,(V_Rock_Current_UYPOS)
+00016814  4E75                    1493      rts
+00016816                          1494  
+00016816                          1495  ResetGravityVariables:
+00016816  21FC 00000001 10B6      1496      move.l #GRAVITY,(Gravity_Cumulative)
+0001681E  21FC 00000000 10BA      1497      move.l #0,(Gravity_Frame_Count)
+00016826  21FC 00000000 10C2      1498      move.l #0,(B_Velocity_Reverse)
+0001682E  4E75                    1499      rts
+00016830                          1500  
+00016830                          1501  ResetSineCosineAngle:
+00016830                          1502                                                      *Set angle of shot to 30 degrees ( 1- 3)
+00016830  21FC 00000001 10CE      1503      move.l #1,(AngleThetaOfShot)
+00016838                          1504                                                      *Cosine and Sine Cumulative
+00016838                          1505                                                      *Will be reset when the rock is removed.
+00016838  21FC 00000000 10C6      1506      move.l #0,(Cosine_Cumulative)
+00016840  21FC 00000000 10CA      1507      move.l #0,(Sine_Cumulative)
+00016848                          1508      
+00016848                          1509                                                      *Set initial firing line
+00016848  21FC 0000004B 10DA      1510      move.l #75,(V_FireLine_X_End_POS)
+00016850  21FC 00000190 10DE      1511      move.l #400,(V_FireLine_Y_End_POS)
+00016858  4E75                    1512      rts
+0001685A                          1513  
+0001685A                          1514  RandomColorLFSR:                                    *Repeat a total of 24 times to get 24 bits
+0001685A  2238 110E               1515      move.l (B_Last_Balloon),d1
+0001685E  0C41 0000               1516      cmpi #0,d1
+00016862  6700 FC40               1517      beq DontUpdate
+00016866  4283                    1518      clr.l d3                                        *will hold the new color
+00016868  4284                    1519      clr.l d4                                        *Holds the counter
+0001686A  7818                    1520      move.l #24,d4
+0001686C                          1521  repeatLFSR:
+0001686C  2238 1142               1522      move.l (RandomSeedLFSR),d1                      *Place the internal state (24 bits)                           
+00016870  2401                    1523      move.l d1,d2                                    *copy internal state to d2 
+00016872  E28A                    1524      lsr.l #1,d2                                     *left shift internal state (d2) by one
+00016874  B342                    1525      eor d1,d2                                       *Exclusive OR d1 and d2.
+00016876                          1526                                                      *Last bit is of interest
+00016876                          1527      
+00016876  C4BC 00000001           1528      and.l #1,d2                                     *Get the last bit. d2's last bit is the only thing retained.
+0001687C                          1529      
+0001687C  E38B                    1530      lsl.l #1,d3                                     *shift d3 to the left
+0001687E  B543                    1531      eor d2,d3                                       *apply bit to register
+00016880                          1532   
+00016880                          1533      
+00016880                          1534      
+00016880  E289                    1535      lsr.l #1,d1                                     *Shift our state by one to the right
+00016882  E18A                    1536      lsl.l #8,d2                                     *Shift bit 24 to the left and that way it's positioned correctly for OR
+00016884  E18A                    1537      lsl.l #8,d2
+00016886  E18A                    1538      lsl.l #8,d2
+00016888  8282                    1539      or.l d2,d1                                      *Create our new state
+0001688A  21C1 1142               1540      move.l d1,(RandomSeedLFSR)                      *move state to RandomSeedLFSR
+0001688E                          1541      
+0001688E  5384                    1542      subi.l #1,d4
+00016890  6EDA                    1543      bgt repeatLFSR
+00016892                          1544                                                      *d3 should hold our random number
+00016892                          1545      
+00016892  21C3 1116               1546      move.l d3,(V_Balloon_Color)
+00016896  4283                    1547      clr.l d3
+00016898  4284                    1548      clr.l d4
+0001689A  4281                    1549      clr.l d1
+0001689C  4282                    1550      clr.l d2
+0001689E  4E75                    1551      rts
+000168A0                          1552      
+000168A0                          1553      
+000168A0                          1554      
+000168A0                          1555  WinState:
+000168A0  21FC 00000001 1146      1556      move.l #1,(B_Is_Win)
+000168A8  4E75                    1557      rts
+000168AA                          1558  
+000168AA                          1559  
+000168AA                          1560  CalcWhichSevSeg:
+000168AA  2038 114E               1561      move.l (B_Screen_First_Print),d0
+000168AE  0C00 0000               1562      cmpi.b #0,d0
+000168B2  6700 FBF0               1563      beq DontUpdate                                  *Dont update until the first image is on the screen
+000168B6                          1564      
+000168B6  2038 112E               1565      move.l (B_Second_Passed),d0
+000168BA  B07C 0000               1566      cmp #0,d0
+000168BE  6700 FBE4               1567      beq DontUpdate                                  *If a second has NOT passed then branch
+000168C2                          1568      
+000168C2  2038 1152               1569      move.l (SevenSegCounter1),d0
+000168C6  5280                    1570      addi.l #1,d0
+000168C8  21C0 1152               1571      move.l d0,(SevenSegCounter1)
+000168CC  2038 1152               1572      move.l (SevenSegCounter1),d0
+000168D0  B07C 000A               1573      cmp #10,d0
+000168D4  6700 0004               1574      beq resetSevenSegCounter
+000168D8  4E75                    1575      rts
+000168DA                          1576  resetSevenSegCounter:
+000168DA  4EB9 000168EA           1577      jsr UpdateTenthsCounter
+000168E0  21FC 00000000 1152      1578      move.l #0,(SevenSegCounter1)
+000168E8  4E75                    1579      rts       
+000168EA                          1580  
+000168EA                          1581  UpdateTenthsCounter:
+000168EA  2038 1156               1582      move.l (SevenSegCounter2),d0
+000168EE  5280                    1583      addi.l #1,d0
+000168F0  21C0 1156               1584      move.l d0,(SevenSegCounter2)
+000168F4  B07C 000A               1585      cmp #10,d0
+000168F8  6700 0004               1586      beq GameOver
+000168FC  4E75                    1587      rts
+000168FE                          1588  GameOver:
+000168FE  21FC 00000001 114A      1589      move.l #1,(B_Is_Lose)
+00016906  4E75                    1590      rts
+00016908                          1591  
+00016908                          1592  
+00016908                          1593  
+00016908                          1594  
+00016908                          1595  
+00016908                          1596  
+00016908                          1597  
+00016908                          1598  
+00016908                          1599  
+00016908                          1600  
+00016908                          1601  
+00016908                          1602  
+00016908                          1603  
+00016908                          1604  
+00016908                          1605  
+00016908                          1606  
+00016908                          1607  
+00016908                          1608  
+00016908                          1609  
+00016908                          1610  
+00016908                          1611  
+00016908                          1612  
+00016908                          1613  
+00016908                          1614  
+00016908                          1615  
+00016908                          1616  -------------------- end include --------------------
+00016908                          1617      INCLUDE "DrawGame.x68"
+00016908                          1618  DrawGame:
+00016908                          1619       
+00016908  4EB9 00016A38           1620      jsr RemoveFireLine 
+0001690E  4EB9 00016A7C           1621      jsr RemoveBalloon
+00016914  4EB9 00016A5A           1622      jsr RemoveRock
+0001691A  4EB9 00016C28           1623      jsr ClearSevSeg
+00016920                          1624      
+00016920  4EB9 00016954           1625      jsr DrawNextSprite      *only archer/slinger at this time
+00016926                          1626      
+00016926  4EB9 00016B42           1627      jsr SetSevenSegment
+0001692C  4EB9 0001698C           1628      jsr DrawFireLine
+00016932  4EB9 00016A04           1629      jsr DrawBalloon
+00016938  4EB9 000169C2           1630      jsr DrawPrimitiveRock
+0001693E                          1631      
+0001693E  4EB9 00016AAE           1632      jsr DrawWinScreen       *only go through if condition is met in the function
+00016944  4EB9 00016AF8           1633      jsr DrawLoseScreen      *only go through if condition is met in the function
+0001694A  4EB9 00016A9E           1634      jsr swapBuffers
+00016950                          1635      
+00016950  4E75                    1636      rts
+00016952                          1637  
+00016952                          1638  DontDraw:
+00016952  4E75                    1639   rts
+00016954                          1640  
+00016954                          1641  DrawNextSprite:
+00016954                          1642                                              *Setup sprite data variables in registers for traversal
+00016954  45F8 1042               1643      lea ArrM_Sprite_Mem_Loc,a2
+00016958  47F8 1046               1644      lea ArrV_Sprite_Dimensions,a3 
+0001695C  7A01                    1645      move.l #TOTAL_UNIQUE_SPRITES,d5         *d5 will be decremented untill all sprites are done being printed
+0001695E                          1646      
+0001695E                          1647  BeginSpriteSetup:    
+0001695E  4EB9 00016D10           1648      jsr SetUpSpriteForPrint
+00016964                          1649  continueRow:
+00016964  2F07                    1650      move.l d7,-(sp)
+00016966  4EB9 00016D40           1651      jsr getRGBValueAndPrintPixel            
+0001696C  2E1F                    1652      move.l (sp)+,d7
+0001696E                          1653      
+0001696E  5286                    1654      addi.l #1,d6                            *Increment the inner iterator
+00016970  5281                    1655      addi.l #1,d1                            *Increment the X print location
+00016972  BC43                    1656      cmp d3,d6                               *compare sprite pixel width count with the total sprite width pixel amount
+00016974                          1657      
+00016974  6FEE                    1658      ble continueRow                         *Inner Loop
+00016976                          1659      
+00016976                          1660                                              *RESET POSITONS FOR X NEEDS TO BE UPDATED CORRECTLY. CURRENTLY NOT GOOD
+00016976                          1661      
+00016976  7C00                    1662      move.l #0,d6                            *Reset the inner iterator to 0
+00016978  7232                    1663      move.l #50,d1                           *Reset the X print location (NEEDS TO BE A VARIABLE!!!!)
+0001697A                          1664      
+0001697A  5287                    1665      addi.l #1,d7                            *Increment the outer loop iterator
+0001697C  5382                    1666      subi.l #1,d2                            *Decrement the Y print location (Prints are done in inverse fashion)
+0001697E                          1667                   
+0001697E  BE44                    1668      cmp d4,d7
+00016980  6FE2                    1669      ble continueRow                         *Outer Loop
+00016982                          1670      
+00016982                          1671                                              *AT THIS POINT A SPRITE HAS BEEN COMPLETLY DRAWN
+00016982                          1672                                              *REPEAT UNTILL ALL SPRITES IN THE PROGRAM HAVE BEEN DRAWN
+00016982  5305                    1673      subi.b #1,d5
+00016984  BA7C 0000               1674      cmp #0,d5
+00016988  66D4                    1675      bne BeginSpriteSetup
+0001698A                          1676      
+0001698A  4E75                    1677      rts
+0001698C                          1678       
+0001698C                          1679  
+0001698C                          1680  DrawFireLine:
+0001698C  223C 000000FF           1681      move.l #RED,d1
+00016992  7050                    1682      move.l #TRAP_SET_PEN_COLOR,d0
+00016994  4E4F                    1683      trap #15
+00016996                          1684      
+00016996                          1685                                             
+00016996  705D                    1686      move.l #TRAP_SET_PEN_WIDTH,d0           *Set fire line width
+00016998  7202                    1687      move.l #FIRE_LINE_WIDTH,d1
+0001699A  4E4F                    1688      trap #15
+0001699C                          1689      
+0001699C  7054                    1690      move.l #TRAP_DRAW_LINE,d0
+0001699E                          1691      
+0001699E  724B                    1692      move.l #PFIRE_LINE_ORG_X,d1
+000169A0  243C 00000190           1693      move.l #PFIRE_LINE_ORG_Y,d2
+000169A6                          1694     
+000169A6  2638 10DA               1695      move.l (V_FireLine_X_End_POS),d3
+000169AA  2838 10DE               1696      move.l (V_FireLine_Y_End_POS),d4
+000169AE                          1697      
+000169AE  4E4F                    1698      trap #15
+000169B0                          1699      
+000169B0                          1700                                              *SAVE THESE POSITIONS SO WE CAN REMOVE THE LINE LATER
+000169B0  43F8 10E6               1701      lea V_FireLine_Pre_Y_End_POS,a1
+000169B4  22B8 10DE               1702      move.l (V_FireLine_Y_End_POS),(a1)
+000169B8  43F8 10E2               1703      lea V_FireLine_Pre_X_End_POS,a1
+000169BC  22B8 10DA               1704      move.l (V_FireLine_X_End_POS),(a1)
+000169C0                          1705  
+000169C0  4E75                    1706      rts 
+000169C2                          1707  
+000169C2                          1708  
+000169C2                          1709  DrawPrimitiveRock:
+000169C2                          1710                                                        *set pen color
+000169C2  7050                    1711      move.l #TRAP_SET_PEN_COLOR,d0
+000169C4  223C 00808080           1712      move.l #GREY,d1
+000169CA  4E4F                    1713      trap #15
+000169CC                          1714      
+000169CC                          1715                                                        *set fill color
+000169CC  7051                    1716      move.l #TRAP_SET_FILL_COLOR,d0
+000169CE  223C 00808080           1717      move.l #GREY,d1
+000169D4  4E4F                    1718      trap #15
+000169D6                          1719      
+000169D6                          1720                                                        *Set Rock Dimensions and draw
+000169D6  7058                    1721      move.l #TRAP_DRAW_CIRCLE,d0
+000169D8                          1722      
+000169D8  2238 108E               1723      move.l V_Rock_Current_LXPOS,d1                    *Left X
+000169DC  2438 1092               1724      move.l V_Rock_Current_UYPOS,d2                    *Upper Y
+000169E0                          1725      
+000169E0  2638 1096               1726      move.l V_Rock_Current_RXPOS,d3                    *Right X
+000169E4  2838 109A               1727      move.l V_Rock_Current_LYPOS,d4                    *Lower Y
+000169E8                          1728      
+000169E8  4E4F                    1729      trap #15
+000169EA                          1730      
+000169EA                          1731                                                        *SAVE THE POSITIONS WE CAN REMOVE THE ROCK LATER
+000169EA  21F8 1092 10A6          1732      move.l (V_Rock_Current_UYPOS),(V_Rock_Prev_UYPOS) *Upper Y
+000169F0  21F8 109A 10AA          1733      move.l (V_Rock_Current_LYPOS),(V_Rock_Prev_LYPOS) *Lower Y
+000169F6                          1734      
+000169F6  21F8 108E 10AE          1735      move.l (V_Rock_Current_LXPOS),(V_Rock_Prev_LXPOS) *Left X
+000169FC  21F8 1096 10B2          1736      move.l (V_Rock_Current_RXPOS),(V_Rock_Prev_RXPOS) *Right X
+00016A02                          1737      
+00016A02  4E75                    1738      rts
+00016A04                          1739      
+00016A04                          1740  DrawBalloon:
+00016A04                          1741                                          
+00016A04  7050                    1742      move.l #TRAP_SET_PEN_COLOR,d0                           *set pen color
+00016A06  223C 00FFFFFF           1743      move.l #WHITE,d1
+00016A0C  4E4F                    1744      trap #15                             
+00016A0E  7051                    1745      move.l #TRAP_SET_FILL_COLOR,d0                          *set fill color
+00016A10  2238 1116               1746      move.l (V_Balloon_Color),d1
+00016A14  4E4F                    1747      trap #15
+00016A16                          1748                                          
+00016A16  7058                    1749      move.l #TRAP_DRAW_CIRCLE,d0                             *Set Balloon Dimensions and draw
+00016A18  2238 10EA               1750      move.l V_Balloon_Current_LXPOS,d1                       *Left X
+00016A1C  2438 10EE               1751      move.l V_Balloon_Current_UYPOS,d2                       *Upper Y
+00016A20  2638 10F2               1752      move.l V_Balloon_Current_RXPOS,d3                       *Right X
+00016A24  2838 10F6               1753      move.l V_Balloon_Current_LYPOS,d4                       *Lower Y
+00016A28  4E4F                    1754      trap #15
+00016A2A                          1755      
+00016A2A                          1756                                                              *SAVE THE POSITIONS WE CAN REMOVE THE BALLOON LATER
+00016A2A  21F8 10EE 10FE          1757      move.l (V_Balloon_Current_UYPOS),(V_Balloon_Prev_UYPOS) *Upper Y
+00016A30  21F8 10F6 1102          1758      move.l (V_Balloon_Current_LYPOS),(V_Balloon_Prev_LYPOS) *Lower Y
+00016A36  4E75                    1759      rts
+00016A38                          1760  
+00016A38                          1761          
+00016A38                          1762  
+00016A38                          1763  RemoveFireLine:
+00016A38  7200                    1764      move.l #BLACK,d1                        *Set fire line color to black because we are going to "remove it". Effectively coloring it the same as the background
+00016A3A  7050                    1765      move.l #TRAP_SET_PEN_COLOR,d0
+00016A3C  4E4F                    1766      trap #15
+00016A3E                          1767      
+00016A3E                          1768                                              *Set fire line width
+00016A3E  705D                    1769      move.l #TRAP_SET_PEN_WIDTH,d0
+00016A40  7202                    1770      move.l #FIRE_LINE_WIDTH,d1
+00016A42  4E4F                    1771      trap #15
+00016A44                          1772      
+00016A44  7054                    1773      move.l #TRAP_DRAW_LINE,d0
+00016A46                          1774      
+00016A46  724B                    1775      move.l #PFIRE_LINE_ORG_X,d1
+00016A48  243C 00000190           1776      move.l #PFIRE_LINE_ORG_Y,d2
+00016A4E                          1777     
+00016A4E  2638 10E2               1778      move.l (V_FireLine_Pre_X_End_POS),d3    *Previous positions
+00016A52  2838 10E6               1779      move.l (V_FireLine_Pre_Y_End_POS),d4
+00016A56                          1780      
+00016A56  4E4F                    1781      trap #15
+00016A58                          1782      
+00016A58  4E75                    1783      rts
+00016A5A                          1784  
+00016A5A                          1785  RemoveRock:
+00016A5A                          1786                                              *set pen color to black to "delete from the screen"
+00016A5A  7050                    1787      move.l #TRAP_SET_PEN_COLOR,d0
+00016A5C  7200                    1788      move.l #BLACK,d1
+00016A5E  4E4F                    1789      trap #15
+00016A60                          1790      
+00016A60                          1791                                              *set fill color to black to "delete from the screen"
+00016A60  7051                    1792      move.l #TRAP_SET_FILL_COLOR,d0
+00016A62  7200                    1793      move.l #BLACK,d1
+00016A64  4E4F                    1794      trap #15
+00016A66                          1795      
+00016A66                          1796                                              *Set Rock Dimensions and draw
+00016A66  7058                    1797      move.l #TRAP_DRAW_CIRCLE,d0
+00016A68                          1798      
+00016A68  2238 10AE               1799      move.l V_Rock_Prev_LXPOS,d1             *Left X (x never change)
+00016A6C  2438 10A6               1800      move.l V_Rock_Prev_UYPOS,d2             *Upper Y
+00016A70                          1801      
+00016A70  2638 10B2               1802      move.l V_Rock_Prev_RXPOS,d3             *Right X (x never change)
+00016A74  2838 10AA               1803      move.l V_Rock_Prev_LYPOS,d4             *Lower Y 
+00016A78                          1804      
+00016A78  4E4F                    1805      trap #15
+00016A7A                          1806      
+00016A7A  4E75                    1807      rts
+00016A7C                          1808  
+00016A7C                          1809  RemoveBalloon:
+00016A7C                          1810                                              *set pen color
+00016A7C  7050                    1811      move.l #TRAP_SET_PEN_COLOR,d0
+00016A7E  7200                    1812      move.l #BLACK,d1
+00016A80  4E4F                    1813      trap #15
+00016A82                          1814      
+00016A82                          1815                                              *set fill color
+00016A82  7051                    1816      move.l #TRAP_SET_FILL_COLOR,d0
+00016A84  7200                    1817      move.l #BLACK,d1
+00016A86  4E4F                    1818      trap #15
+00016A88                          1819      
+00016A88                          1820                                              *Set Balloon Dimensions and draw
+00016A88  7058                    1821      move.l #TRAP_DRAW_CIRCLE,d0
+00016A8A                          1822      
+00016A8A  2238 10EA               1823      move.l V_Balloon_Current_LXPOS,d1       *Left X (x never change)
+00016A8E  2438 10FE               1824      move.l V_Balloon_Prev_UYPOS,d2          *Upper Y
+00016A92                          1825      
+00016A92  2638 10F2               1826      move.l V_Balloon_Current_RXPOS,d3       *Right X (x never change)
+00016A96  2838 1102               1827      move.l V_Balloon_Prev_LYPOS,d4          *Lower Y 
+00016A9A                          1828      
+00016A9A  4E4F                    1829      trap #15
+00016A9C                          1830      
+00016A9C  4E75                    1831      rts
+00016A9E                          1832  
+00016A9E                          1833  
+00016A9E                          1834  
+00016A9E                          1835  
+00016A9E                          1836  swapBuffers
+00016A9E  21FC 00000001 114E      1837      move.l #1,(B_Screen_First_Print)        *Used in printing out the Seven Segment timer. That way it dosent update until the first image is on the screen.
+00016AA6  103C 005E               1838      move.b  #TRAP_REPAINT_SCREEN,d0
+00016AAA  4E4F                    1839      trap    #15
+00016AAC  4E75                    1840      rts
+00016AAE                          1841  
+00016AAE                          1842  
+00016AAE                          1843  
+00016AAE                          1844  
+00016AAE                          1845  DrawWinScreen:
+00016AAE  2038 1146               1846      move.l (B_Is_Win),d0
+00016AB2  B07C 0000               1847      cmp #0,d0
+00016AB6  6700 F9EC               1848      beq DontUpdate
+00016ABA                          1849      
+00016ABA  223C 00000110           1850       move.l #272,d1                         *Setting the X print coordinate to pixel 272
+00016AC0  243C 0000010E           1851       move.l #270,d2                         *Y print coordinate to pixel 270
+00016AC6                          1852       
+00016AC6  2638 1062               1853       move.l V_Win_ImageW,d3                 *Inner loop max (x)
+00016ACA  2838 105E               1854       move.l V_Win_ImageH,d4                 *Outer loop max (y)
+00016ACE                          1855       
+00016ACE  7A00                    1856       move.l #0,d5                           *Inner loop iterator (x)
+00016AD0  7C00                    1857       move.l #0,d6                           *Outer loop iterator (y)
+00016AD2                          1858       
+00016AD2  2E38 106A               1859       move.l (M_Win_DataSLocation),d7        *load the data start location into a1
+00016AD6  2247                    1860       move.l d7,a1
+00016AD8                          1861  
+00016AD8                          1862     
+00016AD8                          1863  continueWinRow:
+00016AD8                          1864      
+00016AD8  4EB9 00016D40           1865      jsr getRGBValueAndPrintPixel
+00016ADE                          1866      
+00016ADE  5285                    1867      addi.l #1,d5                            *add 1 to the inner loop iterator
+00016AE0  5281                    1868      addi.l #1,d1                            *increment print location
+00016AE2  BA43                    1869      cmp d3,d5                               *compare the inner loop max with the iterator
+00016AE4                          1870      
+00016AE4  6FF2                    1871      ble continueWinRow                      *while the inner loop iterator is less than the max repeat\
+00016AE6                          1872      
+00016AE6  5382                    1873      subi.l #1,d2                            *move the print location one up
+00016AE8  223C 00000104           1874      move.l #260,d1                          *reset the print location
+00016AEE  7A00                    1875      move.l #0,d5                            *reset inner loop iterator (x)
+00016AF0  5286                    1876      addi.l #1,d6                            *increment the outer loop iterator (y)
+00016AF2                          1877      
+00016AF2  BC44                    1878      cmp d4,d6  
+00016AF4  6FE2                    1879      ble continueWinRow                      *Outer Loop
+00016AF6                          1880  
+00016AF6                          1881  
+00016AF6  4E75                    1882      rts
+00016AF8                          1883      
+00016AF8                          1884  DrawLoseScreen:
+00016AF8  2038 114A               1885      move.l (B_Is_Lose),d0
+00016AFC  B07C 0000               1886      cmp #0,d0
+00016B00  6700 F9A2               1887      beq DontUpdate
+00016B04                          1888      
+00016B04                          1889      
+00016B04  223C 000000DC           1890       move.l #220,d1                         *Setting the X print coordinate to pixel 272
+00016B0A  243C 000000FA           1891       move.l #250,d2                         *Y print coordinate to pixel 270
+00016B10                          1892       
+00016B10  2638 1072               1893       move.l V_Lose_ImageW,d3                *Inner loop max (x)
+00016B14  2838 106E               1894       move.l V_Lose_ImageH,d4                *Outer loop max (y)
+00016B18                          1895       
+00016B18  7A00                    1896       move.l #0,d5                           *Inner loop iterator (x)
+00016B1A  7C00                    1897       move.l #0,d6                           *Outer loop iterator (y)
+00016B1C                          1898       
+00016B1C  2E38 107A               1899       move.l (M_Lose_DataSLocation),d7       *load the data start location into a1
+00016B20  2247                    1900       move.l d7,a1
+00016B22                          1901  
+00016B22                          1902     
+00016B22                          1903  continueLoseRow:
+00016B22                          1904      
+00016B22  4EB9 00016D40           1905      jsr getRGBValueAndPrintPixel
+00016B28                          1906      
+00016B28  5285                    1907      addi.l #1,d5                            *add 1 to the inner loop iterator
+00016B2A  5281                    1908      addi.l #1,d1                            *increment print location
+00016B2C  BA43                    1909      cmp d3,d5                               *compare the inner loop max with the iterator
+00016B2E                          1910      
+00016B2E  6FF2                    1911      ble continueLoseRow                     *while the inner loop iterator is less than the max repeat\
+00016B30                          1912      
+00016B30  5382                    1913      subi.l #1,d2                            *move the print location one up
+00016B32  223C 000000DC           1914      move.l #220,d1                          *reset the print location
+00016B38  7A00                    1915      move.l #0,d5                            *reset inner loop iterator (x)
+00016B3A  5286                    1916      addi.l #1,d6                            *increment the outer loop iterator (y)
+00016B3C                          1917      
+00016B3C  BC44                    1918      cmp d4,d6  
+00016B3E  6FE2                    1919      ble continueLoseRow                     *Outer Loop
+00016B40                          1920  
+00016B40  4E75                    1921      rts
+00016B42                          1922  
+00016B42                          1923  SetSevenSegment:
+00016B42  2038 114A               1924      move.l (B_Is_Lose),d0
+00016B46  B07C 0001               1925      cmp #1,d0
+00016B4A  6700 F958               1926      beq DontUpdate                          *If you lose DONT update the timer
+00016B4E                          1927      
+00016B4E  2038 112E               1928      move.l (B_Second_Passed),d0
+00016B52  0C00 0000               1929      cmpi.b #0,d0
+00016B56  6700 F94C               1930      beq DontUpdate                          *If a second has NOT passed then branch
+00016B5A                          1931      
+00016B5A  4EB9 00016B68           1932      jsr FirstDigitSevenSeg
+00016B60  4EB9 00016BC8           1933      jsr TenthsDigitSevenSeg
+00016B66                          1934      
+00016B66  4E75                    1935      rts
+00016B68                          1936      
+00016B68                          1937  FirstDigitSevenSeg:
+00016B68                          1938     
+00016B68  4286                    1939      clr.l d6 
+00016B6A  7C00                    1940      move.l #0,d6                            *d6 will be our counter
+00016B6C                          1941      
+00016B6C  43F8 11CE               1942      lea SEVEN_SEGMENT_BITMASK_TABLE,a1
+00016B70                          1943                          
+00016B70                          1944                                              *SevenSegCounter is the offset used to traverse the mask table
+00016B70  2038 1152               1945      move.l (SevenSegCounter1),d0
+00016B74                          1946     
+00016B74                          1947  FirstTraverseSevenSegTable:                
+00016B74  1E19                    1948      move.b (a1)+,d7 *mask is set
+00016B76  5380                    1949      subi.l #1,d0
+00016B78  B07C 0000               1950      cmp #0,d0
+00016B7C  6CF6                    1951      bge FirstTraverseSevenSegTable
+00016B7E                          1952      
+00016B7E                          1953      
+00016B7E                          1954  FirstSevenSegLoop:
+00016B7E  1207                    1955      move.b d7,d1 *saved
+00016B80  C23C 0001               1956      and.b #1,d1 Check each bit
+00016B84  6700 0008               1957      beq FirstSkipDrawSegment
+00016B88  4EB9 00016B9C           1958      jsr FirstDrawSegment
+00016B8E                          1959      
+00016B8E                          1960  FirstSkipDrawSegment:
+00016B8E  E20F                    1961      lsr.b #1,d7
+00016B90  5286                    1962      addi.l #1,d6
+00016B92  BCBC 00000007           1963      cmp.l #7,d6
+00016B98  6DE4                    1964      blt FirstSevenSegLoop
+00016B9A  4E75                    1965      rts
+00016B9C                          1966      
+00016B9C                          1967  FirstDrawSegment:
+00016B9C  43F8 11D8               1968      lea SEVEN_SEG_PRINT_COORDINATES,a1
+00016BA0  2206                    1969      move.l d6,d1
+00016BA2  C2FC 0008               1970      mulu #8,d1
+00016BA6  D3C1                    1971      add.l d1,a1
+00016BA8                          1972      
+00016BA8  223C 000000FF           1973      move.l #RED,d1
+00016BAE  7050                    1974      move.l #TRAP_SET_PEN_COLOR,d0
+00016BB0  4E4F                    1975      trap #15
+00016BB2                          1976      
+00016BB2  103C 005D               1977      move.b #TRAP_SET_PEN_WIDTH,d0
+00016BB6  7203                    1978      move.l #3,d1
+00016BB8  4E4F                    1979      trap #15
+00016BBA                          1980      
+00016BBA  3219                    1981      move.w (a1)+,d1 *x1
+00016BBC  3419                    1982      move.w (a1)+,d2 *x2
+00016BBE  3619                    1983      move.w (a1)+,d3 *y1
+00016BC0  3819                    1984      move.w (a1)+,d4 *y2
+00016BC2                          1985      
+00016BC2  7054                    1986      move.l #TRAP_DRAW_LINE,d0
+00016BC4  4E4F                    1987      trap #15
+00016BC6                          1988      
+00016BC6  4E75                    1989      rts
+00016BC8                          1990  TenthsDigitSevenSeg:
+00016BC8  4286                    1991      clr.l d6 
+00016BCA  7C00                    1992      move.l #0,d6                        *d6 will be our counter
+00016BCC                          1993      
+00016BCC  43F8 11CE               1994      lea SEVEN_SEGMENT_BITMASK_TABLE,a1
+00016BD0                          1995                          
+00016BD0                          1996                                          *SevenSegCounter is the offset used to traverse the mask table
+00016BD0  2038 1156               1997      move.l (SevenSegCounter2),d0
+00016BD4                          1998     
+00016BD4                          1999  TenthsTraverseSevenSegTable:                
+00016BD4  1E19                    2000      move.b (a1)+,d7 *mask is set
+00016BD6  5380                    2001      subi.l #1,d0
+00016BD8  B07C 0000               2002      cmp #0,d0
+00016BDC  6CF6                    2003      bge TenthsTraverseSevenSegTable
+00016BDE                          2004      
+00016BDE                          2005      
+00016BDE                          2006  TenthsSevenSegLoop:
+00016BDE  1207                    2007      move.b d7,d1 *saved
+00016BE0  C23C 0001               2008      and.b #1,d1 *Check each bit
+00016BE4  6700 0008               2009      beq TenthsSkipDrawSegment
+00016BE8  4EB9 00016BFC           2010      jsr TenthsDrawSegment
+00016BEE                          2011      
+00016BEE                          2012  TenthsSkipDrawSegment:
+00016BEE  E20F                    2013      lsr.b #1,d7
+00016BF0  5286                    2014      addi.l #1,d6
+00016BF2  BCBC 00000007           2015      cmp.l #7,d6
+00016BF8  6DE4                    2016      blt TenthsSevenSegLoop
+00016BFA  4E75                    2017      rts
+00016BFC                          2018      
+00016BFC                          2019  TenthsDrawSegment:
+00016BFC  43F8 1210               2020      lea SEVEN_SEG_PRINT_COORDINATES2,a1
+00016C00  2206                    2021      move.l d6,d1
+00016C02  C2FC 0008               2022      mulu #8,d1
+00016C06  D3C1                    2023      add.l d1,a1
+00016C08                          2024      
+00016C08  223C 000000FF           2025      move.l #RED,d1
+00016C0E  7050                    2026      move.l #TRAP_SET_PEN_COLOR,d0
+00016C10  4E4F                    2027      trap #15
+00016C12                          2028      
+00016C12  103C 005D               2029      move.b #TRAP_SET_PEN_WIDTH,d0
+00016C16  7203                    2030      move.l #3,d1
+00016C18  4E4F                    2031      trap #15
+00016C1A                          2032      
+00016C1A  3219                    2033      move.w (a1)+,d1 *x1
+00016C1C  3419                    2034      move.w (a1)+,d2 *x2
+00016C1E  3619                    2035      move.w (a1)+,d3 *y1
+00016C20  3819                    2036      move.w (a1)+,d4 *y2
+00016C22                          2037      
+00016C22  7054                    2038      move.l #TRAP_DRAW_LINE,d0
+00016C24  4E4F                    2039      trap #15
+00016C26                          2040      
+00016C26  4E75                    2041      rts
+00016C28                          2042  
+00016C28                          2043  ClearSevSeg:
+00016C28                          2044  
+00016C28  2038 112E               2045      move.l (B_Second_Passed),d0
+00016C2C  B07C 0000               2046      cmp #0,d0
+00016C30  6700 F872               2047      beq DontUpdate                              *If a second has NOT passed then branch
+00016C34                          2048     
+00016C34  4EB9 00016C80           2049      jsr GetCropMemoryLocation
+00016C3A  2238 1162               2050      move.l FID,d1
+00016C3E  7037                    2051      move.l #TRAP_SET_READ_POSITION,d0
+00016C40  2438 1196               2052      move.l ByteOffsetToBeginReadingCropData,d2
+00016C44  4E4F                    2053      trap #15
+00016C46                          2054      
+00016C46                          2055  
+00016C46                          2056      
+00016C46                          2057                                                  *d1 and d2 will be set to print positions for pixel printing task
+00016C46  2238 117E               2058      move.l CropPrintXCoordinate,d1   
+00016C4A  2438 117A               2059      move.l CropPrintYCoordinate,d2
+00016C4E                          2060      
+00016C4E  2C38 1176               2061      move.l (CropWidth),d6 
+00016C52  DCB8 117E               2062      add.l (CropPrintXCoordinate),d6             *d6 - Number of time the inner loop will iterate (inner loop counter)
+00016C56  2A38 1172               2063      move.l (CropHeight),d5                      *d5 - Number of times the outer loop will iterate (outer loop counter)
+00016C5A                          2064  
+00016C5A                          2065  ContinueCropRow:
+00016C5A                          2066  
+00016C5A  4EB9 00016D62           2067      jsr FileRGBValueAndPrintPixel
+00016C60                          2068  
+00016C60                          2069  
+00016C60  5281                    2070      addi.l #1,d1
+00016C62  B246                    2071      cmp d6,d1
+00016C64  66F4                    2072      bne ContinueCropRow                         *Inner Loop
+00016C66                          2073      
+00016C66                          2074      
+00016C66  2F05                    2075      move.l d5,-(sp)                             *save the outerloop counter
+00016C68  2F02                    2076      move.l d2,-(sp)                             *Save the y-positioin
+00016C6A                          2077      
+00016C6A                          2078  
+00016C6A  4EB9 00016CD8           2079      jsr GetCropReadOffset                       *skip bytes to get to next readposition (uses registers d5 and d2)
+00016C70                          2080      
+00016C70  2238 117E               2081      move.l CropPrintXCoordinate,d1              *reset the x-coordinate
+00016C74                          2082      
+00016C74  241F                    2083      move.l (sp)+,d2                             *save the y-positioin
+00016C76  2A1F                    2084      move.l (sp)+,d5                             *save the outerloop counter
+00016C78                          2085  
+00016C78                          2086      
+00016C78  5382                    2087      subi.l #1,d2
+00016C7A                          2088      
+00016C7A  5385                    2089      subi.l #1,d5
+00016C7C                          2090      
+00016C7C  6EDC                    2091      bgt ContinueCropRow                         *Outer Loop
+00016C7E                          2092  
+00016C7E  4E75                    2093      rts
+00016C80                          2094  GetCropMemoryLocation:
+00016C80                          2095                                                  *calc the number of rows of pixels to skip to get to the crop y-coordinate
+00016C80  2438 104E               2096      move.l (V_Background1_ImageH),d2
+00016C84  94B8 116A               2097      sub.l (CropStartYCoordinate),d2
+00016C88  94B8 1172               2098      sub.l (CropHeight),d2
+00016C8C                          2099      
+00016C8C                          2100                                                  *d5 holds rows to skip
+00016C8C                          2101  
+00016C8C  2E02                    2102      move.l d2,d7                                *save d2 value
+00016C8E                          2103      
+00016C8E  4EB9 00016CF4           2104      jsr calcPadding                             *uses register d5
+00016C94                          2105      
+00016C94  2407                    2106      move.l d7,d2                                *restore d2 value
+00016C96                          2107      
+00016C96  2238 1052               2108      move.l (V_Background1_ImageW),d1
+00016C9A  4EB9 00015F1C           2109      jsr MULTIPLY_FUNCTION                       *d2 results with the number of pixels needed to be skipped from the total rows
+00016CA0                          2110                            
+00016CA0  2238 116E               2111      move.l (CropStartXCoordinate),d1
+00016CA4  D481                    2112      add.l d1,d2                                 *Adds the pixels that need to be traversed in the final row to reach the crop data
+00016CA6                          2113      
+00016CA6  2238 1166               2114      move.l Bitdepth,d1
+00016CAA  4EB9 00015F1C           2115      jsr MULTIPLY_FUNCTION                       *d5 results with the number of bytes needed to be skipped to reach the crop data from the START of the image data
+00016CB0                          2116      
+00016CB0  7236                    2117      move.l #BACKGROUND_DATA_BYTE_OFFSET,d1    
+00016CB2  D481                    2118      add.l d1,d2                                 *We add the bytes in the header which will account for those bytes needed to get to the START of the image data.
+00016CB4                          2119      
+00016CB4  D4B8 1182               2120      add.l (TotalIntialBytePaddingOffset),d2     *Padding needs to be added for the rows that were skipped to get to the first byte of crop data
+00016CB8                          2121                                              
+00016CB8                          2122                                                  *d5 now has the total number of bytes FROM THE START OF THE FILE (including any padding) to get to the beginning of the crop data
+00016CB8                          2123                                              
+00016CB8  21C2 1196               2124      move.l d2,(ByteOffsetToBeginReadingCropData)
+00016CBC  21C2 119A               2125      move.l d2,(CropReadOffsetCounter)
+00016CC0                          2126      
+00016CC0                          2127    
+00016CC0                          2128                                                  *Calculates the number of bytes needed to skip to get to the next row of crop data (adds necessary padding)
+00016CC0                          2129                                                  *Store that result in varible ByteToSkipForNextRead
+00016CC0  2438 1052               2130      move.l (V_Background1_ImageW),d2
+00016CC4  2238 1166               2131      move.l Bitdepth,d1
+00016CC8  4EB9 00015F1C           2132      jsr MULTIPLY_FUNCTION
+00016CCE  D4B8 1186               2133      add.l (BytePaddingOffset),d2
+00016CD2  21C2 1192               2134      move.l d2,(BytesToSkipForNextRead)
+00016CD6                          2135      
+00016CD6  4E75                    2136      rts
+00016CD8                          2137      
+00016CD8                          2138  GetCropReadOffset:
+00016CD8                          2139                                                  *set neaxt read position for the file
+00016CD8  2838 119A               2140      move.l (CropReadOffsetCounter),d4
+00016CDC  2A38 1192               2141      move.l (BytesToSkipForNextRead),d5
+00016CE0  D885                    2142      add.l d5,d4
+00016CE2                          2143      
+00016CE2  21C4 119A               2144      move.l d4,(CropReadOffsetCounter)           *Cumulative read offset
+00016CE6                          2145      
+00016CE6  2238 1162               2146      move.l FID,d1
+00016CEA  7037                    2147      move.l #TRAP_SET_READ_POSITION,d0
+00016CEC  2438 119A               2148      move.l CropReadOffsetCounter,d2
+00016CF0  4E4F                    2149      trap #15
+00016CF2                          2150  
+00016CF2  4E75                    2151      rts
+00016CF4                          2152      
+00016CF4                          2153  CalcPadding:
+00016CF4  2238 1052               2154      move.l (V_Background1_ImageW),d1
+00016CF8  82FC 0004               2155      divu #4,d1
+00016CFC  E089                    2156      lsr.l #8,d1
+00016CFE  E089                    2157      lsr.l #8,d1
+00016D00  21C1 1186               2158      move.l d1,(BytePaddingOffset)
+00016D04                          2159      
+00016D04                          2160      
+00016D04  4EB9 00015F1C           2161      jsr MULTIPLY_FUNCTION
+00016D0A                          2162   
+00016D0A  21C2 1182               2163      move.l d2,(TotalIntialBytePaddingOffset)
+00016D0E  4E75                    2164      rts
+00016D10                          2165  
+00016D10                          2166  
+00016D10                          2167  SetUpSpriteForPrint:
+00016D10                          2168  
+00016D10                          2169                              *Places the begning memory address of the pixel values for the sprite in a1.
+00016D10  225A                    2170      move.l (a2)+,a1 
+00016D12                          2171      
+00016D12                          2172                              *Data stored in a3 is in WIDTH,HEIGHT (x,y). 
+00016D12  261B                    2173      move.l (a3)+,d3         *d3 gets the WIDTH
+00016D14  281B                    2174      move.l (a3)+,d4         *d4 gets the HEIGHT
+00016D16                          2175      
+00016D16                          2176                              *set the new X and Y Print coordinates for printing the sprite
+00016D16  48E7 1800               2177      movem.l d3-d4,-(sp)
+00016D1A  4EB9 00016D2A           2178      jsr DetermineSpriteToPrint
+00016D20  4CDF 0018               2179      movem.l (sp)+,d3-d4
+00016D24                          2180      
+00016D24  7C00                    2181      move.l #0,d6            *Setup inner Loop iterator
+00016D26  7E00                    2182      move.l #0,d7            *Setup outer Loop iterator
+00016D28                          2183      
+00016D28  4E75                    2184      rts
+00016D2A                          2185  
+00016D2A                          2186  DetermineSpriteToPrint:
+00016D2A                          2187       
+00016D2A  2609                    2188      move.l a1,d3
+00016D2C  2838 108A               2189      move.l (M_Archer_DataSLocation),d4
+00016D30  B883                    2190      cmp.l d3,d4
+00016D32  6700 0002               2191      beq IsArcherPrinting
+00016D36                          2192      
+00016D36                          2193    
+00016D36                          2194  
+00016D36                          2195  IsArcherPrinting:
+00016D36  243C 000001AE           2196      move.l #430,d2 *Set Y print location (Currently hard coded but could be made variable to move)
+00016D3C  7232                    2197      move.l #50,d1 *Set X print location (Currently hard coded but could be made variable to move)
+00016D3E  4E75                    2198      rts
+00016D40                          2199  
+00016D40                          2200  
+00016D40                          2201  getRGBValueAndPrintPixel:
+00016D40  48E7 6000               2202      movem.l d1-d2,-(sp) *save values
+00016D44                          2203  
+00016D44  2219                    2204      move.l (a1)+,d1
+00016D46  E099                    2205      ror.l #8,d1 
+00016D48                          2206      
+00016D48  2E3C 00FFFFFF           2207      move.l #WHITE,d7
+00016D4E  B247                    2208      cmp d7,d1
+00016D50  6700 0044               2209      beq SkipPixelPrint
+00016D54                          2210      
+00016D54  7050                    2211      move.l #TRAP_SET_PEN_COLOR,d0
+00016D56  4E4F                    2212      trap #15
+00016D58                          2213      
+00016D58  4CDF 0006               2214      movem.l (sp)+,d1-d2 *bring back values
+00016D5C  7052                    2215      move.l #TRAP_DRAW_PIXEL,d0
+00016D5E  4E4F                    2216      trap #15
+00016D60                          2217   
+00016D60  4E75                    2218      rts
+00016D62                          2219  
+00016D62                          2220  
+00016D62                          2221  FileRGBValueAndPrintPixel:
+00016D62                          2222  
+00016D62  48E7 6000               2223      movem.l d1-d2,-(sp)             *save values
+00016D66  43F8 115E               2224      lea HexColor,a1                 *address where image color data will be read into
+00016D6A                          2225  
+00016D6A  2438 1166               2226      move.l Bitdepth,d2              *number of bytes to read (depends if 24 or 32 bit. 3 and 4 respectively)
+00016D6E                          2227      
+00016D6E  2238 1162               2228      move.l FID,d1
+00016D72                          2229      
+00016D72  7035                    2230      move.l #TRAP_READ_FILE,d0
+00016D74  4E4F                    2231      trap #15
+00016D76                          2232  
+00016D76  2611                    2233      move.l (a1),d3                  *BBGGRR color is transfered to d3 
+00016D78  E08B                    2234      lsr.l #8,d3                     *shifting is required for 24bitdepth images
+00016D7A  2203                    2235      move.l d3,d1                    *Place the corrected color information into d1 for a task that is to be called
+00016D7C                          2236      
+00016D7C  2E3C 00FFFFFF           2237      move.l #WHITE,d7
+00016D82  B247                    2238      cmp d7,d1
+00016D84  6700 0010               2239      beq SkipPixelPrint              *Skip if white pixel
+00016D88                          2240      
+00016D88                          2241      
+00016D88  7050                    2242      move.l #TRAP_SET_PEN_COLOR,d0   *Print pixel at X and Y coordinate (d1,d2)
+00016D8A  4E4F                    2243      trap #15
+00016D8C  4CDF 0006               2244      movem.l (sp)+,d1-d2
+00016D90  7052                    2245      move.l #TRAP_DRAW_PIXEL,d0
+00016D92  4E4F                    2246      trap #15 
+00016D94                          2247      
+00016D94  4E75                    2248      rts
+00016D96                          2249  
+00016D96                          2250  SkipPixelPrint:
+00016D96  4CDF 0006               2251      movem.l (sp)+,d1-d2
+00016D9A  4E75                    2252      rts 
+00016D9C                          2253  
+00016D9C                          2254  
+00016D9C                          2255  
+00016D9C                          2256  
+00016D9C                          2257  
+00016D9C                          2258  
+00016D9C                          2259  
+00016D9C                          2260  
+00016D9C                          2261  
+00016D9C                          2262  
+00016D9C                          2263  
+00016D9C                          2264  
+00016D9C                          2265  
+00016D9C                          2266  
+00016D9C                          2267  
+00016D9C                          2268  
+00016D9C                          2269  
+00016D9C                          2270  -------------------- end include --------------------
+00016D9C                          2271      
+00016D9C                          2272  
+00016D9C                          2273      END    START
+
+No errors detected
+No warnings generated
+
+
+SYMBOL TABLE INFORMATION
+Symbol-name         Value
+-------------------------
+ALL_REG             7FFF
+ANGLETHETAOFSHOT    10CE
+APPLYREVERSEVELOCITY  16672
+APPLYREVERSEYCHANGEROCK  166B0
+APPLYYCHANGEROCK    166A2
+ARCHER_BITDEPTH_MEM_LOC  1298
+ARCHER_COLOR_DATA_MEM_LOC  12B2
+ARCHER_END_BMP_FILE  40CC
+ARCHER_FILE_SIZE    2E50
+ARCHER_PHEIGHT_MEM_LOC  1292
+ARCHER_PWIDTH_MEM_LOC  128E
+ARCHER_START_BMP_FILE  127C
+ARRM_SPRITE_MEM_LOC  1042
+ARRM_SPRITE_ML_END  1046
+ARRV_SPRITE_DIMENSIONS  1046
+ARRV_SPRITE_D_END   104E
+BACKGROUND_BITDEPTH_BYTE_READ  1C
+BACKGROUND_DATA_BYTE_OFFSET  36
+BACKGROUND_HEIGHT_BYTE_OFFSET  16
+BACKGROUND_WIDTH_BYTE_OFFSET  12
+BALLONFALL          1654E
+BALLONMAXHEIGHT     16534
+BALLOONCOLLISIONDETECTED  1675E
+BALLOONLOWEST       16564
+BALLOONRISE         1653A
+BALLOON_HEIGHT      14
+BALLOON_INIT_VELOCITY  4
+BALLOON_SPAWN_LEFT_X  21C
+BALLOON_SPAWN_LOWER_Y  190
+BALLOON_SPAWN_RIGHT_X  244
+BALLOON_SPAWN_UPPER_Y  168
+BALLOON_TOP_Y_POSITION  64
+BALLOON_WIDTH       14
+BEGINBACKGROUNDPRINT  16288
+BEGINSPRITESETUP    1695E
+BIGENDIANTOLITTLEENDIAN  15F14
+BITDEPTH            1166
+BLACK               0
+BLUE                FF0000
+BMP_FILE_IDENTIFIER  1248
+BUFFER              115A
+BUFFER2             1278
+BYTEOFFSETTOBEGINREADINGCROPDATA  1196
+BYTEPADDINGOFFSET   1186
+BYTESTOSKIPFORNEXTREAD  1192
+B_BALLOON_REACHED_LY  110A
+B_BALLOON_REACHED_MY  1106
+B_COLLISIONOCCURED  1132
+B_DOWNKEYPRESSED    113A
+B_FIREKEYPRESSED    113E
+B_IS_LOSE           114A
+B_IS_WIN            1146
+B_LAST_BALLOON      110E
+B_SCREEN_FIRST_PRINT  114E
+B_SECOND_PASSED     112E
+B_UPKEYPRESSED      1136
+B_VELOCITY_REVERSE  10C2
+CALCBACKGROUNDPADDING  16352
+CALCPADDING         16CF4
+CALCWHICHSEVSEG     168AA
+CHECKIFBALLOONCOLLISION  166F8
+CHECKIFROCKCOLLIDED  166D6
+CHECKIFWALLCOLLISION  16744
+CHECKREVERSEVELOCITY  166C2
+CLAMPKEYPRESS       16470
+CLEARREGISTERS      163B0
+CLEARSEVSEG         16C28
+COLOR_TABLE         11BA
+COLOR_TABLE_END     11CE
+CONTINUEBACKGROUNDROW  162B8
+CONTINUECROPROW     16C5A
+CONTINUELOSEROW     16B22
+CONTINUEROW         16964
+CONTINUEWINROW      16AD8
+CONT_MULT           15F30
+COSINEOFANGLE       10D6
+COSINE_CUMULATIVE   10C6
+COS_TABLE           11A2
+CROPHEIGHT          1172
+CROPPRINTXCOORDINATE  117E
+CROPPRINTYCOORDINATE  117A
+CROPREADOFFSET      119E
+CROPREADOFFSETCOUNTER  119A
+CROPSTARTXCOORDINATE  116E
+CROPSTARTYCOORDINATE  116A
+CROPWIDTH           1176
+CURRENTTIME         111E
+DELTATIME           1126
+DETERMINESPRITETOPRINT  16D2A
+DONTDRAW            16952
+DONTUPDATE          164A4
+DOWNKEYPRESSED      1643A
+DRAWBALLOON         16A04
+DRAWFIRELINE        1698C
+DRAWGAME            16908
+DRAWLOSESCREEN      16AF8
+DRAWNEXTSPRITE      16954
+DRAWPRIMITIVEROCK   169C2
+DRAWWINSCREEN       16AAE
+FID                 1162
+FILERGBVALUEANDPRINTPIXEL  16D62
+FINISH_CHECKS       1673A
+FIREKEYPRESSED      16450
+FIRE_LINE_LENGTH    1E
+FIRE_LINE_WIDTH     2
+FIRSTDIGITSEVENSEG  16B68
+FIRSTDRAWSEGMENT    16B9C
+FIRSTSEVENSEGLOOP   16B7E
+FIRSTSKIPDRAWSEGMENT  16B8E
+FIRSTTRAVERSESEVENSEGTABLE  16B74
+FRAME_DELAY_TIME    1
+FRAME_UPDATE_RATE   1
+GAMELOST            1040
+GAMEOVER            168FE
+GAMEWON             103E
+GATHERBACKGROUNDDATA  161A8
+GETBACKGROUNDMEMORYLOCATION  162DE
+GETBACKGROUNDREADOFFSET  16336
+GETCROPMEMORYLOCATION  16C80
+GETCROPREADOFFSET   16CD8
+GETDELTATIME        164A6
+GETFIDGETBITDEPTH   161B6
+GETHEIGHTANDWIDTH   161F4
+GETINPUT            163A2
+GETKEYPRESSES       163E6
+GETRGBVALUEANDPRINTPIXEL  16D40
+GRAVITY             1
+GRAVITY_CUMULATIVE  10B6
+GRAVITY_FRAME_COUNT  10BA
+GRAVITY_FRAME_COUNTER  A
+GRAVITY_MAX         10BE
+GREEN               FF00
+GREY                808080
+HEXCOLOR            115E
+INITIALIZEBALLON    16052
+INITIALIZEROCK      1609E
+INITVARANDPROCESS   160D8
+ISARCHERPRINTING    16D36
+LOADBACKGROUNDPRINT  16186
+LOADCONDITIONSCREENFILEDATA  15F7E
+LOADCROPDATA        1636E
+LOADDATABEFOREGAMELOOP  15F3E
+LOADSPRITEDATA      16004
+LOOPTIMER           16500
+LOSE_BITDEPTH_MEM_LOC  9C10
+LOSE_COLOR_DATA_MEM_LOC  9C2A
+LOSE_END_BMP_FILE   15F14
+LOSE_FILE_SIZE      C320
+LOSE_PHEIGHT_MEM_LOC  9C0A
+LOSE_PWIDTH_MEM_LOC  9C06
+LOSE_START_BMP_FILE  9BF4
+MAINGAMELOOP        1010
+MULTIPLY_FUNCTION   15F1C
+MULT_0              15F38
+MULT_1              15F3C
+M_ARCHER_DATASLOCATION  108A
+M_BACKGROUND1_DATASLOCATION  105A
+M_LOSE_DATASLOCATION  107A
+M_WIN_DATASLOCATION  106A
+NOKEYBOARDINPUT     1646E
+NUMBEROFROWSTOSKIPTOGETTOCROP  118A
+NUMBYTESTOSKIPTOGETTOCROP  118E
+OPENBACKGROUNDFILE  1619A
+PFIRE_LINE_ORG_X    4B
+PFIRE_LINE_ORG_Y    190
+PREVIOUSTIME        1122
+PRINTBACKGROUNDIMAGE  16236
+RANDOMCOLORLFSR     1685A
+RANDOMSEEDLFSR      1142
+REACHUPDATERATE     164FC
+RED                 FF
+REMOVEBALLOON       16A7C
+REMOVEFIRELINE      16A38
+REMOVEROCK          16A5A
+REPEATLFSR          1686C
+RESETGRAVITYVARIABLES  16816
+RESETROCKPOSITION   167F4
+RESETSEVENSEGCOUNTER  168DA
+RESETSINECOSINEANGLE  16830
+RETURNFROMCOLLISIONCHECK  166F6
+ROCK_BALLOON_COLLISIONCHECK2  1670A
+ROCK_BALLOON_COLLISIONCHECK3  1671A
+ROCK_BALLOON_COLLISIONCHECK4  1672A
+ROCK_HEIGHT         5
+ROCK_INIT_VELOCITY  14
+ROCK_SPAWN_LEFT_X   4B
+ROCK_SPAWN_LOWER_Y  195
+ROCK_SPAWN_RIGHT_X  50
+ROCK_SPAWN_UPPER_Y  190
+ROCK_TOP_Y_POSITION  64
+ROCK_WIDTH          5
+SCREEN_HEIGHT       1E0
+SCREEN_WIDTH        280
+SECONDCOUNTER       111A
+SET32BITDEPTH       161EC
+SETBACKGROUNDDIMENSIONS  16262
+SETBACKGROUNDPRINTCOORDINATES  16274
+SETBACKGROUNDSTARTCOORDINATES  16250
+SETCOSSIN           1656C
+SETLASTBALLOON      167B4
+SETREVERSE          166CC
+SETSCREENRESOLUTION  15F70
+SETSEVENSEGMENT     16B42
+SETUPSPRITEFORPRINT  16D10
+SEVENSEGCOUNTER1    1152
+SEVENSEGCOUNTER2    1156
+SEVEN_SEGMENT_BITMASK_TABLE  11CE
+SEVEN_SEG_PRINT_COORDINATES  11D8
+SEVEN_SEG_PRINT_COORDINATES2  1210
+SINEOFANGLE         10D2
+SINE_CUMULATIVE     10CA
+SIN_TABLE           11A8
+SKIPGRAVITYAPPLICATION  1668A
+SKIPPIXELPRINT      16D96
+SKIPSECONDBOOLSET   164DC
+START               1000
+STRING_BALLONPOP_SOUND  125F
+STRING_FILENAME     124A
+STRING_THROW_SOUND  126D
+SWAPBUFFERS         16A9E
+TENTHSDIGITSEVENSEG  16BC8
+TENTHSDRAWSEGMENT   16BFC
+TENTHSSEVENSEGLOOP  16BDE
+TENTHSSKIPDRAWSEGMENT  16BEE
+TENTHSTRAVERSESEVENSEGTABLE  16BD4
+TIMEUPDATEBOOL      112A
+TIMEUPDATERATEREACHED  164E6
+TOTALINTIALBYTEPADDINGOFFSET  1182
+TOTAL_SPRITE_DIM_VALUES  2
+TOTAL_UNIQUE_SPRITES  1
+TRAP_CLEAR_SCREEN   B
+TRAP_CLOSE_ALL_FILES  32
+TRAP_CLOSE_FILE     38
+TRAP_DBUFFER_MODE   11
+TRAP_DISP_NULLT_STR  E
+TRAP_DISP_NULLT_STR_CRLF  D
+TRAP_DISP_UNSNUM_D1  F
+TRAP_DRAWING_MODE   5C
+TRAP_DRAW_CIRCLE    58
+TRAP_DRAW_LINE      54
+TRAP_DRAW_PIXEL     52
+TRAP_GET_CURSOR_POS  B
+TRAP_GET_MOUSE_INPUTS  3D
+TRAP_GET_PRESSED_KEY  13
+TRAP_GET_TIME       8
+TRAP_OPEN_EXISTING_FILE  33
+TRAP_PLAY_WAV_SOUND  49
+TRAP_PRINT_NULLT_DEFAULT  A
+TRAP_READ_FILE      35
+TRAP_REPAINT_SCREEN  5E
+TRAP_SET_FILL_COLOR  51
+TRAP_SET_OUTPUT_RESOLUTION  21
+TRAP_SET_PEN_COLOR  50
+TRAP_SET_PEN_WIDTH  5D
+TRAP_SET_READ_POSITION  37
+TRAVERSECOLORTABLE  16792
+TRAVERSECOSSINTABLES  16588
+UPDATEBALLON        16510
+UPDATEFIRELINE      165A8
+UPDATEGAME          16472
+UPDATEROCK          165EA
+UPDATETENTHSCOUNTER  168EA
+UPKEYPRESSED        16424
+VELOCITY_TABLE      11AE
+V_ARCHER_IMAGEBD    1086
+V_ARCHER_IMAGEH     107E
+V_ARCHER_IMAGEW     1082
+V_BACKGROUND1_IMAGEBD  1056
+V_BACKGROUND1_IMAGEH  104E
+V_BACKGROUND1_IMAGEW  1052
+V_BALLOON_COLLISION_COUNTER  1112
+V_BALLOON_COLOR     1116
+V_BALLOON_CURRENT_LXPOS  10EA
+V_BALLOON_CURRENT_LYPOS  10F6
+V_BALLOON_CURRENT_RXPOS  10F2
+V_BALLOON_CURRENT_UYPOS  10EE
+V_BALLOON_PREV_LYPOS  1102
+V_BALLOON_PREV_UYPOS  10FE
+V_BALLOON_VELOCITY  10FA
+V_FIRELINE_PRE_X_END_POS  10E2
+V_FIRELINE_PRE_Y_END_POS  10E6
+V_FIRELINE_X_END_POS  10DA
+V_FIRELINE_Y_END_POS  10DE
+V_LOSE_IMAGEBD      1076
+V_LOSE_IMAGEH       106E
+V_LOSE_IMAGEW       1072
+V_ROCK_CURRENT_LXPOS  108E
+V_ROCK_CURRENT_LYPOS  109A
+V_ROCK_CURRENT_RXPOS  1096
+V_ROCK_CURRENT_UYPOS  1092
+V_ROCK_PREV_LXPOS   10AE
+V_ROCK_PREV_LYPOS   10AA
+V_ROCK_PREV_RXPOS   10B2
+V_ROCK_PREV_UYPOS   10A6
+V_ROCK_X_VELOCITY   109E
+V_ROCK_Y_VELOCITY   10A2
+V_WIN_IMAGEBD       1066
+V_WIN_IMAGEH        105E
+V_WIN_IMAGEW        1062
+WALLCOLLISIONDETECTED  167D0
+WHITE               FFFFFF
+WINSTATE            168A0
+WIN_BITDEPTH_MEM_LOC  40E8
+WIN_COLOR_DATA_MEM_LOC  4102
+WIN_END_BMP_FILE    9BF4
+WIN_FILE_SIZE       5B28
+WIN_PHEIGHT_MEM_LOC  40E2
+WIN_PWIDTH_MEM_LOC  40DE
+WIN_START_BMP_FILE  40CC
